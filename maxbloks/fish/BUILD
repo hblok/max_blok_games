@@ -6,7 +6,7 @@ load("@rules_python//python:packaging.bzl", "py_wheel", "py_package")
 py_library(
     name = "fish",
     srcs = glob(["*.py"]),
-    data = ["Fish_small.png", "Fish.sh"]
+    data = ["Fish_small.png", "Fish.sh", "game.json"]
 )
 
 py_package(
@@ -18,10 +18,10 @@ py_package(
 )
 
 py_wheel(
-    name = "fish_wheel",
+    name = "wheel",
     distribution = "fish",
-    version = "0.1.8",
-   deps = [
+    version = "$(fish-version)",
+    deps = [ 
         ":fish_package",
     ],
 )

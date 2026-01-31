@@ -2,10 +2,10 @@
 # Extract version from git tag
 TAG=$(git describe --tags --always 2>/dev/null)
 
-if [ -z "$VERSION" ]; then
+if [ -z "$TAG" ]; then
     VERSION_NAME="0.0.0-dev"
 else
-    VERSION_NAME="${VERSION#v}"
+    VERSION_NAME="${TAG#v}"
 fi
 
 export RELEASE_VERSION=$(echo $VERSION_NAME | cut -f 1 -d '-')
