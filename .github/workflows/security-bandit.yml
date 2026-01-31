@@ -1,0 +1,95 @@
+name: Security - Bandit SAST
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**.py'
+      - 'requirements*.txt'
+      - '.github/workflows/security-bandit.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**.py'
+      - 'requirements*.txt'
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  bandit:
+    runs-on: ubuntu-latest
+    name: Bandit Security Scan
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Bandit
+        run: |
+          pip install bandit[toml]
+
+      - name: Run Bandit scan
+        id: bandit
+        run: |
+          # Scan all Python files, exclude tests and venv
+          bandit -c bandit.yaml -r . -ll -f json -o bandit-report.json || true
+          
+          # Also generate human-readable report
+          bandit -c bandit.yaml -r . -ll -f txt
+
+      - name: Upload Bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          retention-days: 30
+
+      - name: Comment PR with Bandit results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('bandit-report.json', 'utf8'));
+            
+            if (report.results.length > 0) {
+              let comment = '## 🔒 Bandit Security Scan Results\n\n';
+              comment += `Found **${report.results.length}** potential security issue(s):\n\n`;
+              
+              report.results.forEach(issue => {
+                comment += `- **${issue.test_id}** (${issue.severity}): ${issue.issue_text}\n`;
+                comment += `  - File: \`${issue.filename}:${issue.line_number}\`\n`;
+              });
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            }
+
+      - name: Fail if high-severity issues found
+        run: |
+          python3 << 'EOF'
+          import json
+          with open('bandit-report.json') as f:
+              report = json.load(f)
+          
+          high_severity = [r for r in report['results'] if r['severity'] == 'HIGH']
+          if high_severity:
+              print(f"❌ Found {len(high_severity)} HIGH severity issue(s)")
+              exit(1)
+          else:
+              print("✅ No HIGH severity issues found")
+          EOF

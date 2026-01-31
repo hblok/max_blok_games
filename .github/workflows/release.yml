@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Set up Bazelisk
+        uses: bazelbuild/setup-bazelisk@v3
+
+      - name: Cache Bazel
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/bazel
+            ~/.cache/bazelisk
+          key: bazel
+          
+      - name: Build Release
+        id: build
+        run: |
+          source ./tools/get_version.sh
+          echo "name=$RELEASE_NAME" >> $GITHUB_OUTPUT
+          echo "version=$RELEASE_VERSION" >> $GITHUB_OUTPUT          
+          bazel build --define=$RELEASE_VERSION //maxbloks/{$RELEASE_NAME}:wheel
+
+      - name: Prepare Artifacts
+        run: |
+          mkdir -p release_artifacts
+          cp bazel-bin/maxbloks/${RELEASE_NAME}/${RELEASE_NAME}-*.whl release_artifacts/
+        
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          files: release_artifacts/*.whl
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ steps.build.outputs.name }} ${{ steps.build.outputs.version }}    
+          generate_release_notes: false
+          draft: false
+          prerelease: false
+          token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

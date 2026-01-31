@@ -1,0 +1,37 @@
+name: Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Bazelisk
+        uses: bazelbuild/setup-bazelisk@v3
+      
+      - name: Cache Bazel
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/bazel
+            ~/.cache/bazelisk
+          key: bazel
+          
+      - name: Install dependencies
+        run: |
+          cd ${{ github.workspace }}
+          python3 -m pip install --upgrade pip
+          pip3 install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          cd ${{ github.workspace }}
+          bazel test --test_output=all ...
