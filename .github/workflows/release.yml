@@ -32,6 +32,8 @@ jobs:
           bazel build --define=${RELEASE_NAME}-version=$RELEASE_VERSION //maxbloks/${RELEASE_NAME}:wheel
 
       - name: Prepare Artifacts
+        env:
+          RELEASE_NAME: ${{ steps.build.outputs.name }}
         run: |
           mkdir -p release_artifacts
           cp bazel-bin/maxbloks/${RELEASE_NAME}/${RELEASE_NAME}-*.whl release_artifacts/
