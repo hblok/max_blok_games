@@ -30,12 +30,12 @@ pip.parse(
     requirements_lock = "//:requirements.txt",
 )
 
-pip.parse(
-    hub_name = "games_pip_dev_deps",
-    python_version = python_version,
-    requirements_lock = "//:requirements-dev.txt",
-)
+#pip.parse(
+#    hub_name = "games_pip_dev_deps",
+#    python_version = python_version,
+#    requirements_lock = "//:requirements-dev.txt",
+#)
 
-use_repo(pip, "games_pip_deps", "games_pip_dev_deps")
+use_repo(pip, "games_pip_deps",)
 
 git_tag_ver = use_extension("//tools:git_tag_version.bzl", "git_tag_version")

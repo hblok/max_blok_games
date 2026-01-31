@@ -7,6 +7,9 @@ py_library(
     name = "fish",
     srcs = glob(["*.py"]),
     data = ["Fish_small.png", "Fish.sh", "game.json"],
+    deps = [
+        "@games_pip_deps//pygame_ce",
+    ],
     visibility = [":__subpackages__"],
 )
 
