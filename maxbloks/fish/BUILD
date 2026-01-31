@@ -6,7 +6,8 @@ load("@rules_python//python:packaging.bzl", "py_wheel", "py_package")
 py_library(
     name = "fish",
     srcs = glob(["*.py"]),
-    data = ["Fish_small.png", "Fish.sh", "game.json"]
+    data = ["Fish_small.png", "Fish.sh", "game.json"],
+    visibility = [":__subpackages__"],
 )
 
 py_package(
