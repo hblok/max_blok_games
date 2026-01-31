@@ -1,0 +1,41 @@
+module(
+    name = "games",
+    version = "1.0.0",
+    compatibility_level = 1,
+)
+
+# Bazel module dependencies
+bazel_dep(name = "rules_python", version = "0.40.0")
+bazel_dep(name = "platforms", version = "0.0.11")
+bazel_dep(name = "rules_proto", version = "7.0.2")
+bazel_dep(name = "protobuf", version = "29.0", repo_name="com_google_protobuf")
+
+# Python configuration
+python_version = "3.11"
+
+# Toolchain
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    python_version = python_version,
+    is_default = True,
+    ignore_root_user_error = True,
+)
+
+# Third-party dependencies via pip
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+
+pip.parse(
+    hub_name = "games_pip_deps",
+    python_version = python_version,
+    requirements_lock = "//:requirements.txt",
+)
+
+pip.parse(
+    hub_name = "games_pip_dev_deps",
+    python_version = python_version,
+    requirements_lock = "//:requirements-dev.txt",
+)
+
+use_repo(pip, "games_pip_deps", "games_pip_dev_deps")
+
+git_tag_ver = use_extension("//tools:git_tag_version.bzl", "git_tag_version")
