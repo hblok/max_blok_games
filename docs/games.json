@@ -1,0 +1,13 @@
+[
+  {
+  "id": "fish",
+  "name": "Eat the Fish",
+  "version": "0.2.5",
+  "description": "Eat the smaller fish; watch out for the shark.",
+  "author": "H.Blok",
+  "entryPoint": "maxbloks/fish/main.py",
+  "startScript": "Fish.sh",
+  "icon": "Fish.png",
+  "downloadUrl": "https://github.com/hblok/max_blok_games/releases/download/v0.2.5-fish/fish-0.2.5-py3-none-any.whl"
+  }
+]
