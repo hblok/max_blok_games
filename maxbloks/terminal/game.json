@@ -8,6 +8,6 @@
   "entryPoint": "maxbloks/terminal/main.py",
   "startScript": "Terminal.sh",
   "icon": "Terminal.png",
-  "downloadUrl": "https://hblok.github.io/sbc-man/terminal-0.1.2-py3-none-any.whl"
+  "downloadUrl": "https://github.com/hblok/max_blok_games/releases/download/v0.1.2-terminal/terminal-0.1.2-py3-none-any.whl"
   }
 ]
