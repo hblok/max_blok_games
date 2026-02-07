@@ -8,6 +8,6 @@
   "entryPoint": "maxbloks/fish/main.py",
   "startScript": "Fish.sh",
   "icon": "Fish.png",
-  "downloadUrl": "https://hblok.github.io/sbc-man/fish-0.1.8-py3-none-any.whl"
+  "downloadUrl": "https://github.com/hblok/max_blok_games/releases/download/v0.2.5-fish/fish-0.2.5-py3-none-any.whl"
   }
 ]

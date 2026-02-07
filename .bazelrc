@@ -1,2 +1,2 @@
-build --define=fish-version=0.0.0
-test --define=fish-version=0.0.0
+build --define=fish-version=0.0.0 --define=terminal-version=0.0.0
+test --define=fish-version=0.0.0 --define=terminal-version=0.0.0

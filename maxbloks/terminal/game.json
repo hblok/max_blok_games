@@ -1,0 +1,13 @@
+[
+  {
+  "id": "terminal",
+  "name": "Handheld Terminal App",
+  "version": "0.1.3",
+  "description": "Terminal Editor for Handheld Gaming Devices",
+  "author": "H.Blok",
+  "entryPoint": "maxbloks/terminal/main.py",
+  "startScript": "Terminal.sh",
+  "icon": "Terminal.png",
+  "downloadUrl": "https://github.com/hblok/max_blok_games/releases/download/v0.1.3-terminal/terminal-0.1.3-py3-none-any.whl"
+  }
+]
