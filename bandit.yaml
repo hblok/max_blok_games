@@ -1,0 +1,17 @@
+# Bandit configuration
+exclude_dirs:
+  - '/venv'
+  - '/tests'
+  - '/build'
+  - '/dist'
+  - '/docs'  
+  - '/google'    
+  - '/bazel*'  
+
+# Tests to skip (if needed)
+skips:
+  # Example: skip hardcoded password checks in test files
+  # - B105
+
+# Severity levels: LOW, MEDIUM, HIGH
+# -ll flag shows MEDIUM and HIGH
