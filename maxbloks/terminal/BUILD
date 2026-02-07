@@ -6,7 +6,7 @@ load("@rules_python//python:packaging.bzl", "py_wheel", "py_package")
 py_library(
     name = "terminal",
     srcs = [
-        "main.py",
+        "main.py", "Terminal.sh",
     ],
     deps = [
         "//maxbloks/terminal/config",
