@@ -32,6 +32,7 @@ from maxbloks.terminal.ui import (
 )
 from maxbloks.terminal.core.command_executor import CommandExecutor
 from maxbloks.terminal.ui.virtual_keyboard import VirtualKeyboard, InputType
+from maxbloks.terminal.core.compat_sdl import init_display
 
 
 class AppState(Enum):
@@ -54,12 +55,16 @@ class TerminalEditor:
     
     def __init__(self):
         """Initialize the terminal editor"""
-        # Initialize pygame
-        pygame.init()
+        # Initialize pygame using compat_sdl for proper display setup
         pygame.joystick.init()
         
-        # Set up display
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        # Set up display using compat_sdl for better handheld device compatibility
+        screen, display_info = init_display(
+            size=(SCREEN_WIDTH, SCREEN_HEIGHT),
+            fullscreen=False,  # Using windowed mode as per current config
+            vsync=True
+        )
+        self.screen = screen
         pygame.display.set_caption("Terminal Editor")
         
         # Initialize clock
