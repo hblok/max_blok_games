@@ -55,13 +55,12 @@ class TerminalEditor:
     
     def __init__(self):
         """Initialize the terminal editor"""
-        # Initialize pygame using compat_sdl for proper display setup
         pygame.joystick.init()
         
         # Set up display using compat_sdl for better handheld device compatibility
         screen, display_info = init_display(
             size=(SCREEN_WIDTH, SCREEN_HEIGHT),
-            fullscreen=False,  # Using windowed mode as per current config
+            fullscreen=False, # TODO: Consider full-screen?
             vsync=True
         )
         self.screen = screen
