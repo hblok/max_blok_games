@@ -79,8 +79,11 @@ class TerminalEditor:
         logger.info(f"display_info: {str(display_info)}")
         
         self.screen = screen
-        config.SCREEN_WIDTH = screen.width
-        config.SCREEN_HEIGHT = screen.height
+        #config.SCREEN_WIDTH = screen.width
+        #config.SCREEN_HEIGHT = screen.height
+        config.SCREEN_WIDTH = display_info["size"][0]
+        config.SCREEN_HEIGHT = display_info["size"][1]
+        
         pygame.display.set_caption("Terminal Editor")
         
         # Initialize clock
