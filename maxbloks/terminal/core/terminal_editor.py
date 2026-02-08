@@ -21,6 +21,7 @@ from enum import Enum, auto
 import logging
 
 # Import local modules
+from maxbloks.terminal.config import config
 from maxbloks.terminal.config.config import (
     SCREEN_WIDTH, SCREEN_HEIGHT, FPS, COLORS, COMMANDS,
     HEADER_HEIGHT, FOOTER_HEIGHT, OUTPUT_PANEL_HEIGHT,
@@ -78,8 +79,8 @@ class TerminalEditor:
         logger.info(f"display_info: {str(display_info)}")
         
         self.screen = screen
-        SCREEN_WIDTH = screen.width
-        SCREEN_HEIGHT = screen.height
+        config.SCREEN_WIDTH = screen.width
+        config.SCREEN_HEIGHT = screen.height
         pygame.display.set_caption("Terminal Editor")
         
         # Initialize clock
