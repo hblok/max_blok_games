@@ -8,7 +8,7 @@ py_library(
     srcs = [
         "main.py",
     ],
-    data = ["Terminal.sh",],
+    data = ["Terminal.sh", "Terminal.png"],
     deps = [
         "//maxbloks/terminal/config",
         "//maxbloks/terminal/core",
