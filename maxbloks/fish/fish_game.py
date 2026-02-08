@@ -1,17 +1,36 @@
+# Copyright (C) 2025 H. Blok
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+import logging
 import random
 import pygame
 
+from maxbloks.fish import compat_sdl
 from maxbloks.fish.game_framework import GameFramework
 from maxbloks.fish.entities import PlayerFish, Fish, Shark, Bubble
 from maxbloks.fish.utils import FISH_COLORS, BACKGROUND_COLOR, BUBBLE_SPAWN_RATE
 from maxbloks.fish.utils import generate_eat_sound, generate_game_over_sound, generate_level_up_sound, create_beep
 
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 
 class FishGame(GameFramework):
-    def __init__(self, width=800, height=600, title="Fish Feeding Frenzy", fps=60):
-        super().__init__(width, height, title, fps)
-        self.init_game()
+    def __init__(self, title="Fish Feeding Frenzy", fps=60):
+        screen, display_info = compat_sdl.init_display(
+            size=(800, 600),
+            fullscreen=True,
+            vsync=True
+        )
+        logger.info(f"screen: {str(screen)}")
+        logger.info(f"display_info: {str(display_info)}")
         
+        super().__init__(screen, display_info, title, fps)
+        self.init_game()
+
     def init_game(self):
         """Initialize game state and entities"""
         # Game state
@@ -21,16 +40,16 @@ class FishGame(GameFramework):
         self.level = 1
         
         # Create entities
-        self.player = PlayerFish(self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 2)
+        self.player = PlayerFish(self.screen_width // 2, self.screen_height // 2)
         self.fishes = []
-        self.shark = Shark(self.SCREEN_WIDTH + 100, random.randint(50, self.SCREEN_HEIGHT - 50))
+        self.shark = Shark(self.screen_width + 100, random.randint(50, self.screen_height - 50))
         self.bubbles = []
         
         # Spawn initial fish
         self.spawn_fish(10)
         
         # Load background image
-        self.background = pygame.Surface((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
+        self.background = pygame.Surface((self.screen_width, self.screen_height))
         self.background.fill(BACKGROUND_COLOR)
         
         # Load sounds with fallbacks
@@ -85,10 +104,10 @@ class FishGame(GameFramework):
                 x = -50
                 speed = random.uniform(1, 3)
             else:
-                x = self.SCREEN_WIDTH + 50
+                x = self.screen_width + 50
                 speed = random.uniform(-3, -1)
                 
-            y = random.randint(50, self.SCREEN_HEIGHT - 50)
+            y = random.randint(50, self.screen_height - 50)
             color = random.choice(FISH_COLORS)
             
             self.fishes.append(Fish(x, y, size, speed, color))
@@ -107,14 +126,14 @@ class FishGame(GameFramework):
             return
             
         # Update player
-        self.player.update(self.movement_x, self.movement_y, self.SCREEN_WIDTH, self.SCREEN_HEIGHT)
+        self.player.update(self.movement_x, self.movement_y, self.screen_width, self.screen_height)
         
         # Update fish
         for fish in self.fishes[:]:
             fish.update()
             
             # Remove fish that are off-screen
-            if (fish.x < -100 and fish.speed < 0) or (fish.x > self.SCREEN_WIDTH + 100 and fish.speed > 0):
+            if (fish.x < -100 and fish.speed < 0) or (fish.x > self.screen_width + 100 and fish.speed > 0):
                 self.fishes.remove(fish)
                 
             # Check collision with player
@@ -138,7 +157,7 @@ class FishGame(GameFramework):
                             self.level_up_sound.play()
         
         # Update shark
-        self.shark.update(self.player.x, self.player.y, self.SCREEN_WIDTH)
+        self.shark.update(self.player.x, self.player.y, self.screen_width)
         
         # Check collision with shark
         if self.player.collides_with(self.shark):
@@ -159,8 +178,8 @@ class FishGame(GameFramework):
             
         # Randomly spawn bubbles
         if random.random() < BUBBLE_SPAWN_RATE:
-            x = random.randint(0, self.SCREEN_WIDTH)
-            y = self.SCREEN_HEIGHT + 10
+            x = random.randint(0, self.screen_width)
+            y = self.screen_height + 10
             size = random.randint(2, 8)
             speed = random.uniform(1, 3)
             self.bubbles.append(Bubble(x, y, size, speed))
@@ -197,19 +216,19 @@ class FishGame(GameFramework):
         
         # Draw game over/win screen
         if self.game_over:
-            self.draw_text("GAME OVER", self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 2 - 50, 
+            self.draw_text("GAME OVER", self.screen_width // 2, self.screen_height // 2 - 50, 
                           48, self.RED, center=True)
-            self.draw_text(f"Final Score: {self.score}", self.SCREEN_WIDTH // 2, 
-                          self.SCREEN_HEIGHT // 2, 36, self.WHITE, center=True)
-            self.draw_text("Press R to restart", self.SCREEN_WIDTH // 2, 
-                          self.SCREEN_HEIGHT // 2 + 50, 24, self.WHITE, center=True)
+            self.draw_text(f"Final Score: {self.score}", self.screen_width // 2, 
+                          self.screen_height // 2, 36, self.WHITE, center=True)
+            self.draw_text("Press R to restart", self.screen_width // 2, 
+                          self.screen_height // 2 + 50, 24, self.WHITE, center=True)
         elif self.game_won:
-            self.draw_text("YOU WIN!", self.SCREEN_WIDTH // 2, self.SCREEN_HEIGHT // 2 - 50, 
+            self.draw_text("YOU WIN!", self.screen_width // 2, self.screen_height // 2 - 50, 
                           48, self.GREEN, center=True)
-            self.draw_text(f"Final Score: {self.score}", self.SCREEN_WIDTH // 2, 
-                          self.SCREEN_HEIGHT // 2, 36, self.WHITE, center=True)
-            self.draw_text("Press R to restart", self.SCREEN_WIDTH // 2, 
-                          self.SCREEN_HEIGHT // 2 + 50, 24, self.WHITE, center=True)
+            self.draw_text(f"Final Score: {self.score}", self.screen_width // 2, 
+                          self.screen_height // 2, 36, self.WHITE, center=True)
+            self.draw_text("Press R to restart", self.screen_width // 2, 
+                          self.screen_height // 2 + 50, 24, self.WHITE, center=True)
         
         # Draw button prompts
         if not self.game_over and not self.game_won:

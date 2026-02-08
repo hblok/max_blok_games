@@ -1,18 +1,18 @@
-# game_framework.py
 import pygame
 import sys
 
+
 class GameFramework:
-    def __init__(self, width=640, height=480, title="Game", fps=60):
-        # Initialize pygame
+    def __init__(self, screen, display_info, title="Game", fps=60):
         pygame.init()
         pygame.joystick.init()
         
         # Screen setup
-        self.SCREEN_WIDTH = width
-        self.SCREEN_HEIGHT = height
+        self.screen = screen
+        self.screen_width = display_info["width"]
+        self.screen_height = display_info["height"]
         self.FPS = fps
-        self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
+
         pygame.display.set_caption(title)
         self.clock = pygame.time.Clock()
         
@@ -163,7 +163,7 @@ class GameFramework:
     
     def draw_button_prompts(self, prompts):
         """Draw button prompts at the bottom of the screen"""
-        y_pos = self.SCREEN_HEIGHT - 30
+        y_pos = self.screen_height - 30
         x_pos = 10
         
         for prompt in prompts:
