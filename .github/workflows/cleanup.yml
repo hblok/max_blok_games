@@ -38,7 +38,9 @@ jobs:
             echo "Processing release type: $type"
             
             type_releases=$(echo "$all_releases" | grep -- "-${type}$" || true)
+            echo "all: $type_releases"
             releases_to_delete=$(echo "$type_releases" | tail -n +$((keep_count + 1)))
+            echo "delete: $releases_to_delete"
             
             for tag in $releases_to_delete; do
               echo "Deleting release: $tag (type: $type)"
