@@ -31,12 +31,20 @@ jobs:
           keep_count=${{ inputs.keep_count }}
           dry_run=${{ inputs.dry_run }}
           
-          releases=$(gh release list --json tagName --jq '.[].tagName' | tail -n +$((keep_count + 1)))
+          all_releases=$(gh release list --json tagName --jq '.[].tagName')
+          release_types=$(echo "$all_releases" | sed -n 's/.*-\(.*\)$/\1/p' | sort -u)
           
-          for tag in $releases; do
-            echo "Deleting release: $tag"
-            if [ "$dry_run" = "false" ]; then
-              gh release delete "$tag" --yes
-              gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/$tag"
-            fi
+          for type in $release_types; do
+            echo "Processing release type: $type"
+            
+            type_releases=$(echo "$all_releases" | grep -- "-${type}$" || true)
+            releases_to_delete=$(echo "$type_releases" | tail -n +$((keep_count + 1)))
+            
+            for tag in $releases_to_delete; do
+              echo "Deleting release: $tag (type: $type)"
+              if [ "$dry_run" = "false" ]; then
+                gh release delete "$tag" --yes
+                gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/$tag" || true
+              fi
+            done
           done
