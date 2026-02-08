@@ -34,16 +34,13 @@ jobs:
           gh release list
           
           all_releases=$(gh release list --limit 100 --json tagName --jq '.[].tagName')
-          echo "all all: $all_releases"
           release_types=$(echo "$all_releases" | sed -n 's/.*-\(.*\)$/\1/p' | sort -u)
           
           for type in $release_types; do
             echo "Processing release type: $type"
             
             type_releases=$(echo "$all_releases" | grep -- "-${type}$" || true)
-            echo "all: $type_releases"
             releases_to_delete=$(echo "$type_releases" | tail -n +$((keep_count + 1)))
-            echo "delete: $releases_to_delete"
             
             for tag in $releases_to_delete; do
               echo "Deleting release: $tag (type: $type)"
