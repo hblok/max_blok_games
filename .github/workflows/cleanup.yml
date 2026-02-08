@@ -31,7 +31,8 @@ jobs:
           keep_count=${{ inputs.keep_count }}
           dry_run=${{ inputs.dry_run }}
           
-          all_releases=$(gh release list --json tagName --jq '.[].tagName')
+          all_releases=$(gh release list --limit 100 --json tagName --jq '.[].tagName')
+          echo "all all: $all_releases"
           release_types=$(echo "$all_releases" | sed -n 's/.*-\(.*\)$/\1/p' | sort -u)
           
           for type in $release_types; do
