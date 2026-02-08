@@ -4,8 +4,8 @@ Easy to modify command definitions and settings
 """
 
 # Screen settings
-SCREEN_WIDTH = 1024
-SCREEN_HEIGHT = 768
+DEFAULT_SCREEN_WIDTH = 1024
+DEFAULT_SCREEN_HEIGHT = 768
 FPS = 60
 
 # Color scheme (terminal-like dark theme)

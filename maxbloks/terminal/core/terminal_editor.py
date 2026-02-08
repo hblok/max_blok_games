@@ -23,7 +23,8 @@ import logging
 # Import local modules
 from maxbloks.terminal.config import config
 from maxbloks.terminal.config.config import (
-    SCREEN_WIDTH, SCREEN_HEIGHT, FPS, COLORS, COMMANDS,
+    DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT,
+    FPS, COLORS, COMMANDS,
     HEADER_HEIGHT, FOOTER_HEIGHT, OUTPUT_PANEL_HEIGHT,
     BUTTON_MAP, DPAD_AXIS_X, DPAD_AXIS_Y, KEY_MAP,
     SSH_OPTIONS, COMMON_PACKAGES
@@ -71,7 +72,7 @@ class TerminalEditor:
         
         # Set up display using compat_sdl for better handheld device compatibility
         screen, display_info = init_display(
-            size=(SCREEN_WIDTH, SCREEN_HEIGHT),
+            size=(DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT),
             fullscreen=True, # TODO: Consider full-screen?
             vsync=True
         )
@@ -79,10 +80,9 @@ class TerminalEditor:
         logger.info(f"display_info: {str(display_info)}")
         
         self.screen = screen
-        #config.SCREEN_WIDTH = screen.width
-        #config.SCREEN_HEIGHT = screen.height
-        config.SCREEN_WIDTH = display_info["size"][0]
-        config.SCREEN_HEIGHT = display_info["size"][1]
+
+        self.screen_width = display_info["size"][0]
+        self.screen_height = display_info["size"][1]
         
         pygame.display.set_caption("Terminal Editor")
         
@@ -103,12 +103,12 @@ class TerminalEditor:
         self.executor = CommandExecutor()
         
         # Calculate layout
-        list_width = SCREEN_WIDTH - 40
-        list_height = SCREEN_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT - OUTPUT_PANEL_HEIGHT - 30
+        list_width = self.screen_width - 40
+        list_height = self.screen_height - HEADER_HEIGHT - FOOTER_HEIGHT - OUTPUT_PANEL_HEIGHT - 30
         
         # Create UI components
         self.command_builder = CommandBuilder(
-            20, 10, SCREEN_WIDTH - 40, HEADER_HEIGHT
+            20, 10, self.screen_width - 40, HEADER_HEIGHT
         )
         
         self.item_list = ScrollableList(
@@ -116,19 +116,19 @@ class TerminalEditor:
         )
         
         self.output_display = OutputDisplay(
-            20, SCREEN_HEIGHT - FOOTER_HEIGHT - OUTPUT_PANEL_HEIGHT - 10,
+            20, self.screen_height - FOOTER_HEIGHT - OUTPUT_PANEL_HEIGHT - 10,
             list_width, OUTPUT_PANEL_HEIGHT
         )
         
         self.button_hints = ButtonHints(
-            0, SCREEN_HEIGHT - FOOTER_HEIGHT, SCREEN_WIDTH, FOOTER_HEIGHT
+            0, self.screen_height - FOOTER_HEIGHT, self.screen_width, FOOTER_HEIGHT
         )
         
-        self.confirm_dialog = ConfirmDialog(SCREEN_WIDTH, SCREEN_HEIGHT)
+        self.confirm_dialog = ConfirmDialog(self.screen_width, self.screen_height)
         
         # Virtual keyboard
         self.virtual_keyboard = VirtualKeyboard(
-            SCREEN_WIDTH, SCREEN_HEIGHT, COLORS, self.font_manager
+            self.screen_width, self.screen_height, COLORS, self.font_manager
         )
         
         # Application state
@@ -1118,8 +1118,8 @@ class TerminalEditor:
             # Draw expanded output over the list area
             expanded_rect = pygame.Rect(
                 20, HEADER_HEIGHT + 20,
-                SCREEN_WIDTH - 40,
-                SCREEN_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT - 30
+                self.screen_width - 40,
+                self.screen_height - HEADER_HEIGHT - FOOTER_HEIGHT - 30
             )
             self.output_display.draw(self.screen, expanded_rect)
         else:
