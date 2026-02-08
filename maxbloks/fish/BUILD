@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 load("@rules_python//python:packaging.bzl", "py_wheel", "py_package")
+load("//tools:py_package_wheel.bzl", "py_package_wheel")
 
 py_library(
     name = "fish",
@@ -13,19 +14,7 @@ py_library(
     visibility = [":__subpackages__"],
 )
 
-py_package(
-    name = "fish_package",
-    packages = ["maxbloks"],
-    deps = [
-      ":fish",
-    ]
-)
-
-py_wheel(
-    name = "wheel",
-    distribution = "fish",
-    version = "$(fish-version)",
-    deps = [ 
-        ":fish_package",
-    ],
+py_package_wheel(
+    name = "fish",
+    deps = [":fish"]
 )
