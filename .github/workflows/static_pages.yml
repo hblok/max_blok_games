@@ -26,6 +26,7 @@ jobs:
 
       - name: Generate game list
         run: |
+          ./tools/set_versions.sh
           jq -s add maxbloks/*/game.json > docs/games.json
       
       - name: Setup Pages

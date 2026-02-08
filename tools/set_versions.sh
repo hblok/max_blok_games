@@ -8,6 +8,6 @@ for game_dir in maxbloks/*; do
     [ -z "$version" ] && continue
     game_json="$game_dir/game.json"
     sed -i "s/{VERSION}/$version/g" $game_json
-    echo "Wrote $version to $game_json
+    echo "Wrote $version to $game_json"
 done
 
