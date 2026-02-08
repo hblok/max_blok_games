@@ -28,7 +28,8 @@ jobs:
         run: |
           source ./tools/get_version.sh
           echo "name=$RELEASE_NAME" >> $GITHUB_OUTPUT
-          echo "version=$RELEASE_VERSION" >> $GITHUB_OUTPUT          
+          echo "version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+          sed -i "s/{VERSION}/${RELEASE_VERSION}/g" maxbloks/${RELEASE_NAME}/game.json
           bazel build --define=${RELEASE_NAME}-version=$RELEASE_VERSION //maxbloks/${RELEASE_NAME}:wheel
 
       - name: Prepare Artifacts

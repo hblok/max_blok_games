@@ -3,6 +3,7 @@ Command Executor Module
 Handles safe execution of shell commands with subprocess
 """
 
+import logging
 import subprocess
 import os
 import signal
@@ -10,6 +11,8 @@ import threading
 from typing import Tuple, Optional, List, Dict, Callable
 
 from maxbloks.terminal.config.config import DANGEROUS_COMMANDS
+
+logger = logging.getLogger(__name__)
 
 
 class CommandExecutor:
@@ -70,6 +73,7 @@ class CommandExecutor:
         
         for pattern in dangerous_patterns:
             if pattern in command:
+                logger.info(f"Dangerous pattern: {pattern} in {command}")
                 return True
                 
         return False
@@ -126,10 +130,12 @@ class CommandExecutor:
         try:
             # Expand user home directory
             expanded_command = os.path.expanduser(command)
+
+            logger.info(f"Execute command {expanded_command}")
             
             self.current_process = subprocess.Popen(
                 expanded_command,
-                shell=True,
+                shell=True,           # nosec - TODO: Could consider no shell for a selection of commands, as a setting.
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=self.cwd,
@@ -431,8 +437,6 @@ class CommandExecutor:
         """
         return self.recent_dirs.copy()
     
-    # ==================== NEW METHODS FOR ENHANCED FEATURES ====================
-    
     def __init_extended_history(self):
         """Initialize extended history tracking (called from __init__)"""
         if not hasattr(self, 'ssh_hosts'):
@@ -718,9 +722,11 @@ class CommandExecutor:
         self.cancel_live()
         
         try:
+            logger.info(f"Execute command {command}")
+            
             self.live_process = subprocess.Popen(
                 command,
-                shell=True,
+                shell=True,           # nosec - TODO: Could consider no shell for a selection of commands, as a setting.
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 cwd=self.cwd,

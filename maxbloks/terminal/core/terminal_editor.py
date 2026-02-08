@@ -18,6 +18,7 @@ import pygame
 import sys
 from typing import List, Dict, Optional, Any
 from enum import Enum, auto
+import logging
 
 # Import local modules
 from maxbloks.terminal.config.config import (
@@ -33,6 +34,14 @@ from maxbloks.terminal.ui import (
 from maxbloks.terminal.core.command_executor import CommandExecutor
 from maxbloks.terminal.ui.virtual_keyboard import VirtualKeyboard, InputType
 from maxbloks.terminal.core.compat_sdl import init_display
+
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 
 class AppState(Enum):
@@ -54,15 +63,20 @@ class TerminalEditor:
     """
     
     def __init__(self):
+        logger.info("TerminalEditor")
+        
         """Initialize the terminal editor"""
         pygame.joystick.init()
         
         # Set up display using compat_sdl for better handheld device compatibility
         screen, display_info = init_display(
             size=(SCREEN_WIDTH, SCREEN_HEIGHT),
-            fullscreen=False, # TODO: Consider full-screen?
+            fullscreen=True, # TODO: Consider full-screen?
             vsync=True
         )
+        logger.info(f"screen: {str(screen)}")
+        logger.info(f"display_info: {str(display_info)}")
+        
         self.screen = screen
         pygame.display.set_caption("Terminal Editor")
         

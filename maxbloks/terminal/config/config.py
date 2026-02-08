@@ -118,7 +118,7 @@ COMMANDS = {
             {'arg': '..', 'desc': 'Parent directory'},
             {'arg': '/home', 'desc': 'Home folder'},
             {'arg': '/media', 'desc': 'Media folder'},
-            {'arg': '/tmp', 'desc': 'Temp folder'},
+            {'arg': '/tmp', 'desc': 'Temp folder'},    # nosec
             {'arg': '/var/log', 'desc': 'Log files'},
             {'arg': '/etc', 'desc': 'Config files'},
         ],
