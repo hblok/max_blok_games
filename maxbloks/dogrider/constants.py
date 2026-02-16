@@ -1,0 +1,47 @@
+# Copyright (C) 2025 H. Blok
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""
+Game constants and configuration
+"""
+import pygame
+
+# Screen settings
+SCREEN_WIDTH = 640
+SCREEN_HEIGHT = 480
+
+# Colors
+SKY_BLUE = (135, 206, 235)
+GRASS_GREEN = (34, 139, 34)
+LIGHT_GREEN = (50, 205, 50)
+DARK_GREEN = (0, 100, 0)
+MOUNTAIN_BLUE = (70, 130, 180)
+WHITE = (255, 255, 255)
+ORANGE = (255, 69, 0)
+RED_ORANGE = (255, 99, 71)
+BROWN = (139, 69, 19)
+LIGHT_BROWN = (210, 180, 140)
+BLACK = (0, 0, 0)
+GRAY = (105, 105, 105)
+DARK_GRAY = (64, 64, 64)
+SILVER = (192, 192, 192)
+GOLD = (255, 215, 0)
+PINK = (255, 105, 180)
+RED = (255, 0, 0)
+TREE_BROWN = (101, 67, 33)
+TREE_GREEN = (0, 128, 0)
+YELLOW = (255, 255, 0)
+BLUE = (0, 0, 255)
+CHROME = (220, 220, 220)
+
+# Game settings
+GRAVITY = 0.8
+JUMP_POWER = -15
+FORWARD_JUMP_BOOST = 4
+GROUND_Y = 350
+MAX_GAME_SPEED = 6.0
+SPEED_INCREASE_RATE = 0.0005
+MAX_OBSTACLES = 75
+
+# Input settings
+JOYSTICK_DEADZONE = 0.2
