@@ -1,2 +1,3 @@
-build --define=fish-version=0.0.0 --define=terminal-version=0.0.0
-test --define=fish-version=0.0.0 --define=terminal-version=0.0.0
+build --define=common-version=0.0.2 --define=dogrider-version=0.0.3 --define=fish-version=0.2.8 --define=terminal-version=0.1.13 
+test  --define=common-version=0.0.2 --define=dogrider-version=0.0.3 --define=fish-version=0.2.8 --define=terminal-version=0.1.13
+
