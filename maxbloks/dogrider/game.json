@@ -1,0 +1,13 @@
+[
+  {
+  "id": "dogrider",
+  "name": "Dog on scooter",
+  "version": "{VERSION}",
+  "description": "Dog navigates a track on his scooter.",
+  "author": "H.Blok",
+  "entryPoint": "maxbloks/dogrider/main.py",
+  "startScript": "Dogrider.sh",
+  "icon": "Dogrider.png",
+  "downloadUrl": "https://github.com/hblok/max_blok_games/releases/download/v{VERSION}-dogrider/dogrider-{VERSION}-py3-none-any.whl"
+  }
+]
