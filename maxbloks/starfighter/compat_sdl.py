@@ -1,0 +1,1 @@
+../common/compat_sdl.py

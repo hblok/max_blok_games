@@ -1,0 +1,13 @@
+[
+  {
+  "id": "starfighter",
+  "name": "Starfighter - Neon space combat.",
+  "version": "{VERSION}",
+  "description": "Rotate, thrust, destroy.",
+  "author": "H.Blok",
+  "entryPoint": "maxbloks/starfighter/main.py",
+  "startScript": "Starfighter.sh",
+  "icon": "Starfighter.png",
+  "downloadUrl": "https://github.com/hblok/max_blok_games/releases/download/v{VERSION}-starfighter/starfighter-{VERSION}-py3-none-any.whl"
+  }
+]
