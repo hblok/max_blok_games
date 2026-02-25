@@ -13,7 +13,7 @@ from __future__ import annotations
 import math
 import random
 
-from starfighter.settings import (
+from maxbloks.starfighter.settings import (
     LOGICAL_WIDTH, LOGICAL_HEIGHT, COLORS,
     DRIFTER_RADIUS, DRIFTER_SPEED, DRIFTER_HP, DRIFTER_SCORE,
     DRIFTER_DROP_CHANCE, DRIFTER_DRIFT_INTERVAL,
@@ -28,8 +28,8 @@ from starfighter.settings import (
     BOSS_BULLET_SPEED, BOSS_BULLET_RADIUS, BOSS_SPREAD,
     SAFE_SPAWN_RADIUS, TIER_MAX_ENEMIES,
 )
-from starfighter.entities import Bullet
-from starfighter.utils import (
+from maxbloks.starfighter.entities import Bullet
+from maxbloks.starfighter.utils import (
     wrap_position, clamp_magnitude, normalize_angle,
     random_range, distance,
 )

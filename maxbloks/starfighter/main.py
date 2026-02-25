@@ -16,14 +16,14 @@ from __future__ import annotations
 import sys
 import pygame
 
-from starfighter.compat_sdl import init_display
-from starfighter.settings import (
+from maxbloks.starfighter.compat_sdl import init_display
+from maxbloks.starfighter.settings import (
     LOGICAL_WIDTH, LOGICAL_HEIGHT, FULLSCREEN, TARGET_FPS,
     INTEGER_SCALING,
 )
-from starfighter.game import StarfighterGame
-from starfighter.input import InputHandler
-from starfighter.visual import draw_player_ship
+from maxbloks.starfighter.game import StarfighterGame
+from maxbloks.starfighter.input import InputHandler
+from maxbloks.starfighter.visual import draw_player_ship
 
 
 def _compute_scaling(screen_w: int, screen_h: int,
