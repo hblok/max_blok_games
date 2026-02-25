@@ -13,7 +13,7 @@ from __future__ import annotations
 import math
 import random
 
-from starfighter.settings import (
+from maxbloks.starfighter.settings import (
     LOGICAL_WIDTH, LOGICAL_HEIGHT,
     FRICTION, ROTATION_SPEED, THRUST_POWER, MAX_SPEED,
     PLAYER_RADIUS, INVINCIBILITY_FRAMES,
@@ -28,7 +28,7 @@ from starfighter.settings import (
     PARTICLE_FRICTION,
     COLORS,
 )
-from starfighter.utils import (
+from maxbloks.starfighter.utils import (
     clamp_magnitude, wrap_position, normalize_angle,
     angle_to, random_range, circles_collide, distance,
 )

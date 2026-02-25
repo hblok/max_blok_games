@@ -14,11 +14,11 @@ import math
 import random
 import pygame
 
-from starfighter.settings import (
+from maxbloks.starfighter.settings import (
     LOGICAL_WIDTH, LOGICAL_HEIGHT, COLORS, STAR_COUNT,
     PLAYER_RADIUS, POWERUP_DURATION, SHIELD_HITS,
 )
-from starfighter.utils import dim_color
+from maxbloks.starfighter.utils import dim_color
 
 
 # ======================================================================

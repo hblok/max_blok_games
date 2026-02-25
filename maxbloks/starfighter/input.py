@@ -8,7 +8,7 @@ Exposes a simple InputState that the game loop reads each frame.
 """
 
 import pygame
-from starfighter.settings import (
+from maxbloks.starfighter.settings import (
     JOYSTICK_DEADZONE,
     JOYSTICK_FIRE_BUTTONS,
     JOYSTICK_PAUSE_BUTTONS,

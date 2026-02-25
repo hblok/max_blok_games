@@ -12,7 +12,7 @@ from __future__ import annotations
 import random
 import pygame
 
-from starfighter.settings import (
+from maxbloks.starfighter.settings import (
     LOGICAL_WIDTH, LOGICAL_HEIGHT, COLORS,
     PLAYER_RADIUS, SPAWN_INTERVAL,
     POWERUP_DURATION, SHIELD_HITS, SHIELD_INVINCIBILITY,
@@ -20,22 +20,22 @@ from starfighter.settings import (
     EXPLOSION_COUNT_ENEMY, EXPLOSION_COUNT_PLAYER,
     load_highscore, save_highscore,
 )
-from starfighter.utils import (
+from maxbloks.starfighter.utils import (
     circles_collide, random_range, distance,
 )
-from starfighter.entities import Player, Bullet, PowerUp, Particle
-from starfighter.enemies import (
+from maxbloks.starfighter.entities import Player, Bullet, PowerUp, Particle
+from maxbloks.starfighter.enemies import (
     Enemy, get_tier, get_max_enemies, available_types,
     safe_spawn_position, create_enemy,
 )
-from starfighter.visual import (
+from maxbloks.starfighter.visual import (
     Starfield,
     draw_player_ship, draw_enemy, draw_player_bullet,
     draw_enemy_bullet, draw_powerup, draw_particle,
     draw_shield, draw_hud,
     draw_menu, draw_pause_overlay, draw_gameover,
 )
-from starfighter.input import InputState
+from maxbloks.starfighter.input import InputState
 
 
 # Power-up definitions (type → color)
