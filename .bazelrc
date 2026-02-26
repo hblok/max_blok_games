@@ -1,3 +1,4 @@
-build --define=common-version=0.0.2 --define=dogrider-version=0.0.3 --define=fish-version=0.2.8 --define=terminal-version=0.1.13 
-test  --define=common-version=0.0.2 --define=dogrider-version=0.0.3 --define=fish-version=0.2.8 --define=terminal-version=0.1.13
+build --define=common-version=0.0.2 --define=dogrider-version=0.0.4 --define=fish-version=0.2.8 --define=starfighter-version=0.0.3 --define=terminal-version=0.1.13 
+test  --define=common-version=0.0.2 --define=dogrider-version=0.0.4 --define=fish-version=0.2.8 --define=starfighter-version=0.0.3 --define=terminal-version=0.1.13
+
 
