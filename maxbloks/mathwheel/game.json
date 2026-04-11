@@ -1,0 +1,13 @@
+[
+  {
+  "id": "mathwheel",
+  "name": "MathWheel",
+  "version": "{VERSION}",
+  "description": "A fun math practice game for children. Solve addition and subtraction equations using a number wheel.",
+  "author": "H.Blok",
+  "entryPoint": "maxbloks/mathwheel/main.py",
+  "startScript": "MathWheel.sh",
+  "icon": "MathWheel.png",
+  "downloadUrl": "https://github.com/hblok/max_blok_games/releases/download/v{VERSION}-mathwheel/mathwheel-{VERSION}-py3-none-any.whl"
+  }
+]
