@@ -201,7 +201,7 @@ JOYSTICK_DEADZONE = 0.2
     "name": "Your Game",
     "description": "Brief description of your game",
     "author": "Your Name",
-    "version": "0.1.0"
+    "version": "0.0.1"
 }
 ```
 
@@ -209,7 +209,7 @@ JOYSTICK_DEADZONE = 0.2
 
 ```json
 {
-    "version": "0.1.0"
+    "version": "0.0.1"
 }
 ```
 
