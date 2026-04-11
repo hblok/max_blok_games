@@ -16,7 +16,8 @@ class TestConstants(unittest.TestCase):
         colors = [
             constants.WHITE, constants.BLACK, constants.RED,
             constants.GREEN, constants.BLUE, constants.YELLOW,
-            constants.BG_COLOR, constants.STAR_COLOR,
+            constants.BG_COLOR, constants.STAR_COLOR, constants.SCORE_COLOR,
+            constants.CORRECT_COLOR, constants.WRONG_COLOR, constants.WRONG_BG_COLOR,
         ]
         for color in colors:
             self.assertIsInstance(color, tuple)
@@ -67,9 +68,9 @@ class TestConstants(unittest.TestCase):
     def test_font_sizes_positive(self):
         fonts = [
             constants.FONT_SIZE_TITLE, constants.FONT_SIZE_EQUATION,
-            constants.FONT_SIZE_WHEEL, constants.FONT_SIZE_BUTTON,
-            constants.FONT_SIZE_HUD, constants.FONT_SIZE_MENU,
-            constants.FONT_SIZE_FEEDBACK,
+            constants.FONT_SIZE_WHEEL_INLINE, constants.FONT_SIZE_HUD,
+            constants.FONT_SIZE_MENU, constants.FONT_SIZE_FEEDBACK,
+            constants.SCORE_FONT_SIZE,
         ]
         for size in fonts:
             self.assertGreater(size, 0)
@@ -80,3 +81,10 @@ class TestConstants(unittest.TestCase):
 
     def test_target_fps_positive(self):
         self.assertGreater(constants.TARGET_FPS, 0)
+
+    def test_correct_feedback_duration_positive(self):
+        self.assertGreater(constants.CORRECT_FEEDBACK_DURATION, 0)
+        self.assertGreater(constants.CORRECT_AUTO_ADVANCE_DELAY, 0)
+
+    def test_wrong_feedback_blink_rate_positive(self):
+        self.assertGreater(constants.WRONG_FEEDBACK_BLINK_RATE, 0)

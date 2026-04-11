@@ -1,7 +1,15 @@
 # Copyright (C) 2025 H. Blok
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""MathWheelGame — main game class with state machine and rendering."""
+"""MathWheelGame — main game class with state machine and rendering.
+
+Key UX decisions:
+- The number wheel is shown INLINE at the ? position in the equation.
+- CORRECT answer: brief green flash, then auto-advance to next question.
+- WRONG answer:   persistent red flash that STAYS until player presses a key,
+                  then they may retry or skip.
+- Score: simple numeric counter in the top-left corner (no star icons).
+"""
 
 import math
 import pygame
@@ -14,7 +22,7 @@ from maxbloks.mathwheel.game_framework import GameFramework
 
 
 class MathWheelGame(GameFramework):
-    """Math practice game with number wheel input."""
+    """Math practice game with inline number wheel input."""
 
     # States
     MENU = "menu"
@@ -38,10 +46,15 @@ class MathWheelGame(GameFramework):
     def _init_fonts(self):
         self.font_title = pygame.font.Font(None, constants.FONT_SIZE_TITLE)
         self.font_equation = pygame.font.Font(None, constants.FONT_SIZE_EQUATION)
-        self.font_wheel = pygame.font.Font(None, constants.FONT_SIZE_WHEEL)
-        self.font_wheel_dim = pygame.font.Font(None, constants.FONT_SIZE_WHEEL_DIM)
-        self.font_button = pygame.font.Font(None, constants.FONT_SIZE_BUTTON)
+        # Inline wheel fonts — same height as equation digits
+        self.font_wheel_inline = pygame.font.Font(
+            None, constants.FONT_SIZE_WHEEL_INLINE
+        )
+        self.font_wheel_inline_dim = pygame.font.Font(
+            None, constants.FONT_SIZE_WHEEL_INLINE_DIM
+        )
         self.font_hud = pygame.font.Font(None, constants.FONT_SIZE_HUD)
+        self.font_score = pygame.font.Font(None, constants.SCORE_FONT_SIZE)
         self.font_menu = pygame.font.Font(None, constants.FONT_SIZE_MENU)
         self.font_menu_small = pygame.font.Font(None, constants.FONT_SIZE_MENU_SMALL)
         self.font_feedback = pygame.font.Font(None, constants.FONT_SIZE_FEEDBACK)
@@ -52,14 +65,6 @@ class MathWheelGame(GameFramework):
             (self.screen_width, self.screen_height)
         )
         self._render_gradient_bg(self.bg_surface)
-
-        # Pre-render star shapes
-        self.star_surface = self._render_star(
-            constants.STAR_SIZE, constants.STAR_COLOR
-        )
-        self.star_empty_surface = self._render_star(
-            constants.STAR_SIZE, constants.STAR_EMPTY_COLOR
-        )
 
     def _init_state(self):
         """Initialize all game state."""
@@ -83,9 +88,10 @@ class MathWheelGame(GameFramework):
 
         # Current question
         self.question = None
-        self.waiting_for_next = False
-        self.can_retry = True
-        self._wrong_count = 0
+        # Auto-advance timer: counts down after a correct answer
+        self._advance_timer = 0
+        # Wrong feedback is persistent; player must press a key to dismiss it
+        self._wrong_dismissed = False
 
         # Menu state
         self.menu_cursor = constants.MENU_ITEM_PLAY
@@ -112,9 +118,9 @@ class MathWheelGame(GameFramework):
         self.wheel.set_range(0, max(self.question.result + 10, 20))
         self.wheel.set_value(0)
         self.focus.reset()
-        self.waiting_for_next = False
-        self.can_retry = True
-        self._wrong_count = 0
+        self._advance_timer = 0
+        self._wrong_dismissed = False
+        self.feedback.dismiss()
 
     def _check_answer(self):
         if self.wheel.value == self.question.answer:
@@ -122,19 +128,18 @@ class MathWheelGame(GameFramework):
             self.difficulty.record_correct()
             self.feedback.trigger_correct(earned)
             self.star_anim.trigger()
-            self.waiting_for_next = True
+            # Schedule auto-advance
+            self._advance_timer = constants.CORRECT_AUTO_ADVANCE_DELAY
         else:
             self.score.record_wrong()
             self.difficulty.record_wrong()
             self.feedback.trigger_wrong()
-            self._wrong_count += 1
-            if self._wrong_count >= 3:
-                self.can_retry = True
-                self.waiting_for_next = False
+            self._wrong_dismissed = False
 
     def _skip_question(self):
-        self.waiting_for_next = True
-        self.feedback.trigger_wrong()
+        """Skip to the next question immediately."""
+        self.feedback.dismiss()
+        self._next_question()
 
     # ------------------------------------------------------------------
     # Input handling
@@ -185,12 +190,21 @@ class MathWheelGame(GameFramework):
             self.state = self.MENU
             return
 
-        if self.waiting_for_next and self.feedback.is_finished:
-            if self.shoot_button_pressed or self.movement_y != 0:
-                self._next_question()
+        # While correct feedback is showing, ignore all other input
+        # (auto-advance will handle the transition)
+        if self.feedback.active and self.feedback.correct:
             return
 
-        if self.feedback.active:
+        # Wrong feedback is persistent — any action key dismisses it
+        if self.feedback.active and self.feedback.persistent:
+            if self.shoot_button_pressed or self.movement_y != 0:
+                self.feedback.dismiss()
+                self._wrong_dismissed = True
+            return
+
+        # Normal gameplay input
+        if self.back_button_pressed:
+            self.state = self.MENU
             return
 
         # Focus navigation with left/right
@@ -219,6 +233,7 @@ class MathWheelGame(GameFramework):
             elif self.focus.current == entities.UIFocus.SKIP:
                 self._skip_question()
             elif self.focus.current == entities.UIFocus.WHEEL:
+                # Enter on wheel moves focus to submit
                 self.focus.current = entities.UIFocus.SUBMIT
 
     # ------------------------------------------------------------------
@@ -233,6 +248,13 @@ class MathWheelGame(GameFramework):
         self.wheel.update()
         self.feedback.update(dt)
         self.star_anim.update(dt)
+
+        # Auto-advance after correct answer
+        if self._advance_timer > 0:
+            self._advance_timer -= dt
+            if self._advance_timer <= 0:
+                self._advance_timer = 0
+                self._next_question()
 
         # Key repeat for wheel
         if self._wheel_held:
@@ -283,7 +305,6 @@ class MathWheelGame(GameFramework):
         cx = self.screen_width // 2
         y = 40
 
-        # Title
         self._draw_centered_text(
             "MathWheel", cx, y, self.font_title, constants.TITLE_COLOR
         )
@@ -302,7 +323,6 @@ class MathWheelGame(GameFramework):
             item_y = y + idx * 60
             self._draw_menu_item(cx, item_y, label, selected, op)
 
-        # Instructions at bottom
         self._draw_centered_text(
             "↑↓ Select   Enter/A Confirm   Esc/B Back",
             cx, self.screen_height - 30,
@@ -333,37 +353,37 @@ class MathWheelGame(GameFramework):
     def _draw_playing(self):
         self.screen.blit(self.bg_surface, (0, 0))
 
-        self._draw_star_bar()
-        self._draw_equation()
-        self._draw_wheel()
+        self._draw_score()
+        self._draw_equation_with_wheel()
         self._draw_buttons()
-        self._draw_feedback()
+        self._draw_wrong_feedback()
+        self._draw_correct_feedback()
         self._draw_hud()
 
-    def _draw_star_bar(self):
-        x = 10
+    def _draw_score(self):
+        """Draw numeric score in the top-left corner."""
+        score_text = str(self.score.stars)
+        # Animated scale when a star was just earned
+        if self.star_anim.active:
+            scale = self.star_anim.scale
+            size = int(constants.SCORE_FONT_SIZE * scale)
+            font = pygame.font.Font(None, max(size, 8))
+        else:
+            font = self.font_score
+
+        surf = font.render(score_text, True, constants.SCORE_COLOR)
+        # Draw a small label next to it
+        label_surf = self.font_hud.render("pts", True, constants.GRAY)
+        x = 12
         y = constants.STAR_BAR_Y
-        # Show filled stars
-        for i in range(min(self.score.stars, constants.MAX_STARS_DISPLAY)):
-            surf = self.star_surface
-            if self.star_anim.active and i == self.score.stars - 1:
-                scale = self.star_anim.scale
-                w = int(constants.STAR_SIZE * scale)
-                h = int(constants.STAR_SIZE * scale)
-                surf = pygame.transform.scale(self.star_surface, (w, h))
-            self.screen.blit(surf, (x + i * constants.STAR_SPACING, y))
+        self.screen.blit(surf, (x, y))
+        self.screen.blit(
+            label_surf,
+            (x + surf.get_width() + 4, y + surf.get_height() - label_surf.get_height())
+        )
 
-        if self.score.stars > constants.MAX_STARS_DISPLAY:
-            count_text = f"×{self.score.stars}"
-            self._draw_text_at(
-                count_text,
-                x + constants.MAX_STARS_DISPLAY * constants.STAR_SPACING + 4,
-                y + 4,
-                self.font_hud,
-                constants.STAR_COLOR,
-            )
-
-    def _draw_equation(self):
+    def _draw_equation_with_wheel(self):
+        """Draw the full equation; replace the ? position with the inline wheel."""
         if self.question is None:
             return
 
@@ -372,103 +392,114 @@ class MathWheelGame(GameFramework):
 
         left, op, right, result = self.question.display_values
 
-        parts = []
-        parts.append(self._eq_part(left))
-        parts.append(("  " + op + "  ", False))
-        parts.append(self._eq_part(right))
-        parts.append(("  =  ", False))
-        parts.append(self._eq_part(result))
+        # Build parts: each is (text_or_None, is_wheel)
+        # is_wheel=True means render the inline picker here
+        parts = self._build_equation_parts(left, op, right, result)
 
-        # Measure total width
+        # Measure total width using inline-wheel width for the picker slot
+        wheel_slot_w = self._inline_wheel_width()
         total_w = 0
-        rendered = []
-        for text, is_blank in parts:
-            if is_blank:
-                surf = self.font_equation.render("?", True, constants.WHEEL_SELECTED)
+        widths = []
+        for text, is_wheel in parts:
+            if is_wheel:
+                w = wheel_slot_w
             else:
                 surf = self.font_equation.render(text, True, constants.WHITE)
-            rendered.append((surf, is_blank))
-            total_w += surf.get_width()
+                w = surf.get_width()
+            widths.append(w)
+            total_w += w
 
-        # Draw centered
+        # Draw each part
         x = cx - total_w // 2
-        for surf, is_blank in rendered:
-            rect = surf.get_rect(midleft=(x, ey))
-            if is_blank:
-                # Draw box behind the question mark
-                box = rect.inflate(12, 8)
-                pygame.draw.rect(
-                    self.screen, constants.EQUATION_BG, box, border_radius=8
-                )
-                pygame.draw.rect(
-                    self.screen, constants.WHEEL_SELECTED, box, 2, border_radius=8
-                )
-            self.screen.blit(surf, rect)
-            x += surf.get_width()
+        for idx, (text, is_wheel) in enumerate(parts):
+            w = widths[idx]
+            if is_wheel:
+                self._draw_inline_wheel(x, ey, w)
+            else:
+                surf = self.font_equation.render(text, True, constants.WHITE)
+                rect = surf.get_rect(midleft=(x, ey))
+                self.screen.blit(surf, rect)
+            x += w
 
-    def _eq_part(self, value):
-        """Return (text, is_blank) for an equation part."""
-        if value is None:
-            return ("?", True)
-        return (str(value), False)
+    def _build_equation_parts(self, left, op, right, result):
+        """Return list of (text, is_wheel) for each part of the equation."""
+        parts = []
+        parts.append((str(left) if left is not None else None, left is None))
+        parts.append(("  " + op + "  ", False))
+        parts.append((str(right) if right is not None else None, right is None))
+        parts.append(("  =  ", False))
+        parts.append((str(result) if result is not None else None, result is None))
+        return parts
 
-    def _draw_wheel(self):
-        cx = self.screen_width // 2
-        wy = int(self.screen_height * constants.WHEEL_Y_RATIO)
-        item_h = 48
+    def _inline_wheel_width(self):
+        """Width to reserve for the inline wheel slot."""
+        # Wide enough for two digits plus padding
+        sample = self.font_wheel_inline.render("00", True, constants.WHITE)
+        return sample.get_width() + 20
+
+    def _draw_inline_wheel(self, slot_x, center_y, slot_w):
+        """Draw the vertically scrolling number picker centred at slot_x+slot_w/2."""
+        cx = slot_x + slot_w // 2
+        item_h = self.font_wheel_inline.size("0")[1] + 6
 
         visible = self.wheel.get_visible_numbers()
-        is_focused = self.focus.current == entities.UIFocus.WHEEL
 
-        # Background box
-        box_w = 120
-        box_h = item_h * self.wheel.visible_items + 10
+        # Background box — highlight border changes colour on feedback
+        box_h = item_h * self.wheel.visible_items + 8
         box_rect = pygame.Rect(
-            cx - box_w // 2, wy - box_h // 2, box_w, box_h
+            cx - slot_w // 2, center_y - box_h // 2, slot_w, box_h
         )
-        pygame.draw.rect(
-            self.screen, constants.WHEEL_BG, box_rect, border_radius=12
-        )
-        border_color = constants.WHEEL_SELECTED if is_focused else constants.EQUATION_BORDER
-        pygame.draw.rect(
-            self.screen, border_color, box_rect, 2, border_radius=12
-        )
+
+        if self.feedback.active and self.feedback.correct:
+            border_col = constants.CORRECT_COLOR
+            bg_col = (20, 80, 30)
+        elif self.feedback.active and self.feedback.persistent:
+            border_col = constants.WRONG_COLOR if self.feedback.blink_visible else constants.EQUATION_BORDER
+            bg_col = constants.WRONG_BG_COLOR if self.feedback.blink_visible else constants.EQUATION_BG
+        else:
+            border_col = constants.WHEEL_SELECTED
+            bg_col = constants.WHEEL_BG
+
+        pygame.draw.rect(self.screen, bg_col, box_rect, border_radius=10)
+        pygame.draw.rect(self.screen, border_col, box_rect, 3, border_radius=10)
 
         for num, rel_pos in visible:
-            ny = wy + rel_pos * item_h
+            ny = center_y + rel_pos * item_h
             if rel_pos == 0:
-                # Selected number
-                highlight = pygame.Rect(
-                    cx - box_w // 2 + 4, ny - item_h // 2 + 2,
-                    box_w - 8, item_h - 4,
+                # Selected row highlight
+                hi_rect = pygame.Rect(
+                    cx - slot_w // 2 + 3, ny - item_h // 2 + 1,
+                    slot_w - 6, item_h - 2,
                 )
                 pygame.draw.rect(
-                    self.screen, constants.WHEEL_HIGHLIGHT, highlight,
-                    border_radius=8,
+                    self.screen, constants.WHEEL_HIGHLIGHT, hi_rect, border_radius=7
                 )
                 color = constants.WHEEL_SELECTED
-                font = self.font_wheel
+                font = self.font_wheel_inline
             else:
-                dist = abs(rel_pos)
                 color = constants.WHEEL_DIM_COLOR
-                font = self.font_wheel_dim
+                font = self.font_wheel_inline_dim
 
             text_surf = font.render(str(num), True, color)
             text_rect = text_surf.get_rect(center=(cx, ny))
             self.screen.blit(text_surf, text_rect)
 
-        # Draw scroll arrows
-        arrow_color = constants.WHEEL_SELECTED if is_focused else constants.GRAY
+        # Scroll arrows
+        arrow_col = constants.WHEEL_SELECTED
         if self.wheel.value > self.wheel.min_val:
-            self._draw_arrow_up(cx, wy - box_h // 2 - 14, arrow_color)
+            self._draw_arrow_up(cx, box_rect.top - 10, arrow_col)
         if self.wheel.value < self.wheel.max_val:
-            self._draw_arrow_down(cx, wy + box_h // 2 + 14, arrow_color)
+            self._draw_arrow_down(cx, box_rect.bottom + 10, arrow_col)
 
     def _draw_buttons(self):
+        """Draw submit (checkmark) and skip buttons below the equation."""
         by = int(self.screen_height * constants.SUBMIT_Y_RATIO)
         cx = self.screen_width // 2
 
-        # Submit button (checkmark)
+        # Disable buttons while feedback is active
+        if self.feedback.active:
+            return
+
         submit_x = cx - 50
         submit_focused = self.focus.current == entities.UIFocus.SUBMIT
         self._draw_circle_button(
@@ -478,7 +509,6 @@ class MathWheelGame(GameFramework):
         )
         self._draw_checkmark(submit_x, by, 16, constants.WHITE)
 
-        # Skip button (arrow right)
         skip_x = cx + 50
         skip_focused = self.focus.current == entities.UIFocus.SKIP
         self._draw_circle_button(
@@ -488,65 +518,52 @@ class MathWheelGame(GameFramework):
         )
         self._draw_skip_arrow(skip_x, by, 12, constants.WHITE)
 
-    def _draw_circle_button(self, x, y, radius, color, focused):
-        pygame.draw.circle(self.screen, color, (x, y), radius)
-        if focused:
-            pygame.draw.circle(
-                self.screen, constants.WHITE, (x, y), radius + 3, 3
-            )
-
-    def _draw_checkmark(self, x, y, size, color):
-        points = [
-            (x - size // 2, y),
-            (x - size // 6, y + size // 2),
-            (x + size // 2, y - size // 3),
-        ]
-        pygame.draw.lines(self.screen, color, False, points, 4)
-
-    def _draw_skip_arrow(self, x, y, size, color):
-        points = [
-            (x - size // 2, y - size // 2),
-            (x + size // 2, y),
-            (x - size // 2, y + size // 2),
-        ]
-        pygame.draw.polygon(self.screen, color, points)
-        # Double arrow line
-        lx = x + size // 2 + 4
-        pygame.draw.line(
-            self.screen, color, (lx, y - size // 2), (lx, y + size // 2), 3
-        )
-
-    def _draw_feedback(self):
-        if not self.feedback.active:
+    def _draw_correct_feedback(self):
+        """Brief green overlay + score animation shown after a correct answer."""
+        if not (self.feedback.active and self.feedback.correct):
             return
 
         alpha = self.feedback.alpha
         cx = self.screen_width // 2
-        fy = int(self.screen_height * 0.42)
+        fy = int(self.screen_height * 0.72)
 
-        if self.feedback.correct:
-            text = "✓"
-            color = constants.CORRECT_COLOR
-        else:
-            text = "✗"
-            color = constants.WRONG_COLOR
-
-        surf = self.font_feedback.render(text, True, color)
+        surf = self.font_feedback.render("✓", True, constants.CORRECT_COLOR)
         surf.set_alpha(int(alpha * 255))
         rect = surf.get_rect(center=(cx, fy))
         self.screen.blit(surf, rect)
 
-        if self.feedback.correct and self.feedback.earned_stars > 0:
-            star_text = f"+{self.feedback.earned_stars} ★"
-            star_surf = self.font_hud.render(
-                star_text, True, constants.STAR_COLOR
-            )
+        if self.feedback.earned_stars > 0:
+            star_text = f"+{self.feedback.earned_stars}"
+            star_surf = self.font_score.render(star_text, True, constants.STAR_COLOR)
             star_surf.set_alpha(int(alpha * 255))
-            sr = star_surf.get_rect(center=(cx, fy + 36))
+            sr = star_surf.get_rect(center=(cx, fy + 46))
             self.screen.blit(star_surf, sr)
 
+    def _draw_wrong_feedback(self):
+        """Persistent red banner shown after a wrong answer until dismissed."""
+        if not (self.feedback.active and self.feedback.persistent):
+            return
+
+        if not self.feedback.blink_visible:
+            return
+
+        cx = self.screen_width // 2
+        fy = int(self.screen_height * 0.72)
+
+        # Red ✗ symbol
+        surf = self.font_feedback.render("✗", True, constants.WRONG_COLOR)
+        rect = surf.get_rect(center=(cx, fy))
+        self.screen.blit(surf, rect)
+
+        # "Press any key to retry" hint
+        hint = self.font_hud.render(
+            "Press ↑↓ or Enter to retry", True, constants.WRONG_COLOR
+        )
+        hr = hint.get_rect(center=(cx, fy + 44))
+        self.screen.blit(hint, hr)
+
     def _draw_hud(self):
-        """Draw bottom HUD with controls hint and difficulty."""
+        """Draw bottom HUD with difficulty level and controls hint."""
         y = self.screen_height - 26
         config = constants.DIFFICULTY_CONFIG[self.difficulty.current_level]
         diff_text = f"Level: {config['label']}"
@@ -575,23 +592,6 @@ class MathWheelGame(GameFramework):
             b = int(top[2] + (bot[2] - top[2]) * t)
             pygame.draw.line(surface, (r, g, b), (0, y), (w, y))
 
-    def _render_star(self, size, color):
-        """Render a 5-pointed star as a surface."""
-        surf = pygame.Surface((size, size), pygame.SRCALPHA)
-        cx = size // 2
-        cy = size // 2
-        r_outer = size // 2 - 1
-        r_inner = r_outer * 0.4
-        points = []
-        for i in range(10):
-            angle = math.radians(i * 36 - 90)
-            r = r_outer if i % 2 == 0 else r_inner
-            px = cx + r * math.cos(angle)
-            py = cy + r * math.sin(angle)
-            points.append((px, py))
-        pygame.draw.polygon(surf, color, points)
-        return surf
-
     def _draw_arrow_up(self, x, y, color):
         points = [(x, y - 6), (x - 8, y + 4), (x + 8, y + 4)]
         pygame.draw.polygon(self.screen, color, points)
@@ -599,6 +599,33 @@ class MathWheelGame(GameFramework):
     def _draw_arrow_down(self, x, y, color):
         points = [(x, y + 6), (x - 8, y - 4), (x + 8, y - 4)]
         pygame.draw.polygon(self.screen, color, points)
+
+    def _draw_circle_button(self, x, y, radius, color, focused):
+        pygame.draw.circle(self.screen, color, (x, y), radius)
+        if focused:
+            pygame.draw.circle(
+                self.screen, constants.WHITE, (x, y), radius + 3, 3
+            )
+
+    def _draw_checkmark(self, x, y, size, color):
+        points = [
+            (x - size // 2, y),
+            (x - size // 6, y + size // 2),
+            (x + size // 2, y - size // 3),
+        ]
+        pygame.draw.lines(self.screen, color, False, points, 4)
+
+    def _draw_skip_arrow(self, x, y, size, color):
+        points = [
+            (x - size // 2, y - size // 2),
+            (x + size // 2, y),
+            (x - size // 2, y + size // 2),
+        ]
+        pygame.draw.polygon(self.screen, color, points)
+        lx = x + size // 2 + 4
+        pygame.draw.line(
+            self.screen, color, (lx, y - size // 2), (lx, y + size // 2), 3
+        )
 
     def _draw_centered_text(self, text, x, y, font, color):
         surf = font.render(text, True, color)

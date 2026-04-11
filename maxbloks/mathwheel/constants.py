@@ -40,6 +40,7 @@ STAR_COLOR = (255, 220, 60)
 STAR_EMPTY_COLOR = (80, 85, 120)
 CORRECT_COLOR = (80, 220, 120)
 WRONG_COLOR = (255, 100, 100)
+WRONG_BG_COLOR = (100, 30, 30)
 MENU_BG = (35, 40, 75)
 MENU_ITEM_BG = (55, 60, 110)
 MENU_ITEM_SELECTED = (80, 90, 160)
@@ -47,6 +48,7 @@ MENU_ITEM_BORDER = (100, 110, 180)
 TOGGLE_ON = (80, 200, 80)
 TOGGLE_OFF = (160, 60, 60)
 TITLE_COLOR = (255, 220, 60)
+SCORE_COLOR = (255, 220, 60)
 
 # Difficulty levels
 DIFFICULTY_EASY = 0
@@ -102,7 +104,7 @@ WRONG_ANSWER_PENALTY = 0
 QUESTIONS_PER_DIFFICULTY_UP = 5
 EASY_MIX_RATIO = 0.25
 
-# Wheel settings
+# Wheel settings (inline in equation)
 WHEEL_VISIBLE_ITEMS = 5
 WHEEL_MIN_VALUE = 0
 WHEEL_MAX_VALUE = 30
@@ -110,29 +112,40 @@ WHEEL_REPEAT_DELAY = 400
 WHEEL_REPEAT_INTERVAL = 80
 
 # Animation timings (milliseconds)
-FEEDBACK_DURATION = 1200
-FEEDBACK_FADE_START = 800
+# After a CORRECT answer: show green feedback briefly, then auto-advance
+CORRECT_FEEDBACK_DURATION = 900   # total correct feedback display time
+CORRECT_AUTO_ADVANCE_DELAY = 900  # ms before next question loads automatically
+
+# After a WRONG answer: show red feedback that stays until player presses a key
+WRONG_FEEDBACK_HOLD = True        # wrong feedback stays until dismissed
+WRONG_FEEDBACK_BLINK_RATE = 500   # ms per blink cycle when persistent
+
 STAR_ANIM_DURATION = 600
 TRANSITION_DURATION = 400
 
 # Layout constants (relative to screen)
-EQUATION_Y_RATIO = 0.25
-WHEEL_Y_RATIO = 0.55
-SUBMIT_Y_RATIO = 0.80
+EQUATION_Y_RATIO = 0.38
+WHEEL_Y_RATIO = 0.55       # vertical center for inline-wheel in equation area
+SUBMIT_Y_RATIO = 0.72
 STAR_BAR_Y = 10
 STAR_SIZE = 24
 STAR_SPACING = 28
 
+# Score display
+SCORE_FONT_SIZE = 40
+
 # Font sizes
 FONT_SIZE_TITLE = 64
 FONT_SIZE_EQUATION = 72
+FONT_SIZE_WHEEL_INLINE = 72    # same size as equation numbers
+FONT_SIZE_WHEEL_INLINE_DIM = 44  # smaller numbers above/below selected
 FONT_SIZE_WHEEL = 56
 FONT_SIZE_WHEEL_DIM = 40
 FONT_SIZE_BUTTON = 36
 FONT_SIZE_HUD = 28
 FONT_SIZE_MENU = 36
 FONT_SIZE_MENU_SMALL = 24
-FONT_SIZE_FEEDBACK = 48
+FONT_SIZE_FEEDBACK = 56
 
 # Input
 JOYSTICK_DEADZONE = 0.3

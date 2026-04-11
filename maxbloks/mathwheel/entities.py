@@ -62,45 +62,78 @@ class NumberWheel:
 
 
 class FeedbackEffect:
-    """Manages visual feedback for correct/wrong answers."""
+    """Manages visual feedback for correct/wrong answers.
+
+    Correct feedback: runs for CORRECT_FEEDBACK_DURATION ms then clears itself.
+    Wrong feedback:   stays active (persistent=True) until dismiss() is called.
+    """
 
     def __init__(self):
         self.active = False
         self.correct = False
+        self.persistent = False   # wrong answers stay until dismissed
         self.timer = 0
-        self.duration = constants.FEEDBACK_DURATION
         self.earned_stars = 0
+        self._blink_timer = 0
+        self.blink_visible = True
 
     def trigger_correct(self, earned_stars=1):
         self.active = True
         self.correct = True
-        self.timer = self.duration
+        self.persistent = False
+        self.timer = constants.CORRECT_FEEDBACK_DURATION
         self.earned_stars = earned_stars
+        self.blink_visible = True
 
     def trigger_wrong(self):
         self.active = True
         self.correct = False
-        self.timer = self.duration
+        self.persistent = True   # stays until dismiss()
+        self.timer = 0
         self.earned_stars = 0
+        self._blink_timer = 0
+        self.blink_visible = True
+
+    def dismiss(self):
+        """Clear persistent wrong feedback so the player can retry."""
+        self.active = False
+        self.persistent = False
+        self.timer = 0
 
     def update(self, dt_ms):
-        if self.active:
+        if not self.active:
+            return
+        if not self.persistent:
+            # Correct: count down and auto-clear
             self.timer -= dt_ms
             if self.timer <= 0:
                 self.active = False
                 self.timer = 0
+        else:
+            # Wrong: blink the red indicator
+            self._blink_timer += dt_ms
+            if self._blink_timer >= constants.WRONG_FEEDBACK_BLINK_RATE:
+                self._blink_timer -= constants.WRONG_FEEDBACK_BLINK_RATE
+                self.blink_visible = not self.blink_visible
 
     @property
     def alpha(self):
-        if not self.active:
-            return 0.0
-        if self.timer < constants.FEEDBACK_FADE_START:
-            return self.timer / constants.FEEDBACK_FADE_START
+        """Fade-out alpha for correct feedback only."""
+        if not self.active or self.persistent:
+            return 1.0
+        fade_start = constants.CORRECT_FEEDBACK_DURATION * 0.4
+        if self.timer < fade_start:
+            return max(0.0, self.timer / fade_start)
         return 1.0
 
     @property
     def is_finished(self):
         return not self.active
+
+    @property
+    def wrong_visible(self):
+        """True when the blinking wrong indicator should be drawn."""
+        return self.active and self.persistent and self.blink_visible
 
 
 class StarAnimation:
