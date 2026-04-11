@@ -87,36 +87,66 @@ class TestFeedbackEffect(unittest.TestCase):
 
     def test_initial_inactive(self):
         self.assertFalse(self.fb.active)
+        self.assertTrue(self.fb.is_finished)
 
     def test_trigger_correct(self):
         self.fb.trigger_correct(2)
         self.assertTrue(self.fb.active)
         self.assertTrue(self.fb.correct)
+        self.assertFalse(self.fb.persistent)
         self.assertEqual(self.fb.earned_stars, 2)
 
-    def test_trigger_wrong(self):
-        self.fb.trigger_wrong()
-        self.assertTrue(self.fb.active)
-        self.assertFalse(self.fb.correct)
-
-    def test_update_finishes(self):
+    def test_correct_auto_expires(self):
         self.fb.trigger_correct()
-        self.fb.update(constants.FEEDBACK_DURATION + 100)
+        self.fb.update(constants.CORRECT_FEEDBACK_DURATION + 100)
         self.assertFalse(self.fb.active)
         self.assertTrue(self.fb.is_finished)
 
-    def test_alpha_decays(self):
-        self.fb.trigger_correct()
-        alpha_start = self.fb.alpha
-        self.fb.update(constants.FEEDBACK_FADE_START + 100)
-        alpha_mid = self.fb.alpha
-        self.assertLessEqual(alpha_mid, alpha_start)
+    def test_trigger_wrong_is_persistent(self):
+        self.fb.trigger_wrong()
+        self.assertTrue(self.fb.active)
+        self.assertFalse(self.fb.correct)
+        self.assertTrue(self.fb.persistent)
 
-    def test_alpha_zero_when_inactive(self):
-        self.assertEqual(self.fb.alpha, 0.0)
+    def test_wrong_does_not_expire_on_its_own(self):
+        self.fb.trigger_wrong()
+        # Update for a long time — should NOT expire
+        self.fb.update(10000)
+        self.assertTrue(self.fb.active)
 
-    def test_is_finished_when_inactive(self):
+    def test_wrong_dismissed(self):
+        self.fb.trigger_wrong()
+        self.fb.dismiss()
+        self.assertFalse(self.fb.active)
         self.assertTrue(self.fb.is_finished)
+
+    def test_correct_alpha_fades(self):
+        self.fb.trigger_correct()
+        # Early in animation — alpha should be 1
+        self.assertEqual(self.fb.alpha, 1.0)
+        # Near end of animation — alpha should be lower
+        self.fb.update(int(constants.CORRECT_FEEDBACK_DURATION * 0.8))
+        self.assertLess(self.fb.alpha, 1.0)
+
+    def test_alpha_full_when_persistent(self):
+        self.fb.trigger_wrong()
+        self.assertEqual(self.fb.alpha, 1.0)
+
+    def test_wrong_blinks(self):
+        self.fb.trigger_wrong()
+        initial = self.fb.blink_visible
+        self.fb.update(constants.WRONG_FEEDBACK_BLINK_RATE + 10)
+        self.assertNotEqual(self.fb.blink_visible, initial)
+
+    def test_wrong_visible_property(self):
+        self.fb.trigger_wrong()
+        # blink_visible starts True
+        self.assertTrue(self.fb.wrong_visible)
+
+    def test_dismiss_clears_persistent_flag(self):
+        self.fb.trigger_wrong()
+        self.fb.dismiss()
+        self.assertFalse(self.fb.persistent)
 
 
 class TestStarAnimation(unittest.TestCase):
