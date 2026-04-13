@@ -1,4 +1,4 @@
-# Copyright (C) 2025 H. Blok
+# Copyright (C) 2026 H. Blok
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """UI entities for MathWheel: NumberWheel, FeedbackEffect, StarAnimation."""
@@ -9,7 +9,7 @@ from maxbloks.mathwheel import constants
 class NumberWheel:
     """A scrollable number picker for selecting answers."""
 
-    def __init__(self, min_val=0, max_val=30):
+    def __init__(self, min_val=0, max_val=40):
         self.min_val = min_val
         self.max_val = max_val
         self.value = 0

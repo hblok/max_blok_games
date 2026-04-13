@@ -1,4 +1,4 @@
-# Copyright (C) 2025 H. Blok
+# Copyright (C) 2026 H. Blok
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """Question generation and difficulty logic for MathWheel."""
@@ -38,7 +38,7 @@ class Question:
     @property
     def wheel_range(self):
         """Return (min_val, max_val) for the number wheel."""
-        return 0, max(self.result + 5, 20)
+        return 0, max(abs(a)+abs(b)+5, self.result + 5, 40)
 
 
 def generate_addition(difficulty_level):
