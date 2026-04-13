@@ -183,39 +183,3 @@ class TestStarAnimation(unittest.TestCase):
         self.assertEqual(self.sa.progress, 1.0)
 
 
-class TestUIFocus(unittest.TestCase):
-
-    def setUp(self):
-        self.focus = entities.UIFocus()
-
-    def test_starts_on_wheel(self):
-        self.assertEqual(self.focus.current, entities.UIFocus.WHEEL)
-
-    def test_move_right_to_submit(self):
-        self.focus.move_right()
-        self.assertEqual(self.focus.current, entities.UIFocus.SUBMIT)
-
-    def test_move_right_to_skip(self):
-        self.focus.move_right()
-        self.focus.move_right()
-        self.assertEqual(self.focus.current, entities.UIFocus.SKIP)
-
-    def test_move_right_stays_at_skip(self):
-        self.focus.move_right()
-        self.focus.move_right()
-        self.focus.move_right()
-        self.assertEqual(self.focus.current, entities.UIFocus.SKIP)
-
-    def test_move_left_from_skip(self):
-        self.focus.current = entities.UIFocus.SKIP
-        self.focus.move_left()
-        self.assertEqual(self.focus.current, entities.UIFocus.SUBMIT)
-
-    def test_move_left_stays_at_wheel(self):
-        self.focus.move_left()
-        self.assertEqual(self.focus.current, entities.UIFocus.WHEEL)
-
-    def test_reset(self):
-        self.focus.move_right()
-        self.focus.reset()
-        self.assertEqual(self.focus.current, entities.UIFocus.WHEEL)

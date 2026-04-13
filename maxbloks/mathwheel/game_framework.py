@@ -34,17 +34,29 @@ class GameFramework:
         # Input state
         self.keys_pressed = set()
         self.keys_just_pressed = set()
+
+        # shoot_button  = A button (joystick 0/1) / Space / Enter
+        #                 → select number AND submit answer in one press
         self.shoot_button_pressed = False
+
+        # action_button = X button (joystick 3) / keyboard X
+        #                 → open in-game menu
         self.action_button_pressed = False
+
+        # back_button   = keyboard Escape only
+        #                 → close menu / navigate back
         self.back_button_pressed = False
+
+        # skip_button   = D-pad right (hat 0, x=+1) / keyboard Right arrow
+        #                 → skip current question
+        self.skip_button_pressed = False
+
         self.movement_x = 0
         self.movement_y = 0
 
         # Joystick axis tracking for digital-style input
         self._joy_axis_y_held = False
         self._joy_axis_x_held = False
-        self._joy_y_just = 0
-        self._joy_x_just = 0
 
     def handle_input(self):
         """Handle common input from keyboard and gamepad."""
@@ -52,12 +64,14 @@ class GameFramework:
         self.shoot_button_pressed = False
         self.action_button_pressed = False
         self.back_button_pressed = False
+        self.skip_button_pressed = False
         self.movement_x = 0
         self.movement_y = 0
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+
             elif event.type == pygame.KEYDOWN:
                 self.keys_pressed.add(event.key)
                 self.keys_just_pressed.add(event.key)
@@ -67,23 +81,32 @@ class GameFramework:
                     self.action_button_pressed = True
                 if event.key == pygame.K_ESCAPE:
                     self.back_button_pressed = True
+
             elif event.type == pygame.KEYUP:
                 self.keys_pressed.discard(event.key)
+
             elif event.type == pygame.JOYBUTTONDOWN:
+                # Buttons 8 / 13 = Menu/Start → exit game
                 if event.button in (8, 13):
-                    self.back_button_pressed = True
+                    self.running = False
+                # Buttons 0 / 1 = A / B → submit answer
                 elif event.button in (0, 1):
                     self.shoot_button_pressed = True
-                elif event.button == 2:
-                    self.action_button_pressed = True
+                # Button 3 = X → open in-game menu
                 elif event.button == 3:
-                    self.back_button_pressed = True
+                    self.action_button_pressed = True
+
             elif event.type == pygame.JOYHATMOTION:
                 hat_x, hat_y = event.value
+                # Hat up/down → scroll wheel
                 if hat_y != 0:
                     self.movement_y = -hat_y
-                if hat_x != 0:
-                    self.movement_x = hat_x
+                # Hat right → skip question  (hat_x == +1)
+                # Hat left  → scroll left / nothing special in this game
+                if hat_x == 1:
+                    self.skip_button_pressed = True
+                elif hat_x == -1:
+                    self.movement_x = -1
 
         # Keyboard directional just-pressed
         if pygame.K_UP in self.keys_just_pressed or pygame.K_w in self.keys_just_pressed:
@@ -92,8 +115,9 @@ class GameFramework:
             self.movement_y = 1
         if pygame.K_LEFT in self.keys_just_pressed or pygame.K_a in self.keys_just_pressed:
             self.movement_x = -1
+        # Keyboard Right / D also triggers skip (mirrors D-pad right)
         if pygame.K_RIGHT in self.keys_just_pressed or pygame.K_d in self.keys_just_pressed:
-            self.movement_x = 1
+            self.skip_button_pressed = True
 
         # Joystick axis as digital input (with edge detection)
         if self.joystick:
@@ -111,6 +135,8 @@ class GameFramework:
             if abs(axis_x) > threshold:
                 if not self._joy_axis_x_held:
                     self._joy_axis_x_held = True
+                    # Axis right is NOT skip — only hat right is skip.
+                    # Axis is used for UI navigation in menus only.
                     self.movement_x = 1 if axis_x > 0 else -1
             else:
                 self._joy_axis_x_held = False

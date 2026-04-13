@@ -168,30 +168,3 @@ class StarAnimation:
         if p < 0.5:
             return 1.0 + p * 0.8
         return 1.4 - (p - 0.5) * 0.8
-
-
-class UIFocus:
-    """Tracks which UI element has focus for keyboard/gamepad navigation."""
-
-    WHEEL = 0
-    SUBMIT = 1
-    SKIP = 2
-
-    def __init__(self):
-        self.current = self.WHEEL
-        self._count = 3
-
-    def move_right(self):
-        if self.current == self.WHEEL:
-            self.current = self.SUBMIT
-        elif self.current == self.SUBMIT:
-            self.current = self.SKIP
-
-    def move_left(self):
-        if self.current == self.SKIP:
-            self.current = self.SUBMIT
-        elif self.current == self.SUBMIT:
-            self.current = self.WHEEL
-
-    def reset(self):
-        self.current = self.WHEEL
