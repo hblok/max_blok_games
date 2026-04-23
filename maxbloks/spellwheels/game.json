@@ -1,0 +1,15 @@
+[
+  {
+  "id": "spellwheels",
+  "name": "SpellWheels",
+  "version": "{VERSION}",
+  "description": "A handheld-first, icon-driven spelling game for first-grade children learning basic German. Rotate letter wheels to spell words matching the displayed icon.",
+  "author": "H.Blok",
+  "entryPoint": "maxbloks/spellwheels/main.py",
+  "startScript": "SpellWheels.sh",
+  "icon": "SpellWheels.png",
+  "category": "education",
+  "tags": ["education", "spelling", "children", "german", "handheld", "kids"],
+  "downloadUrl": "https://github.com/hblok/max_blok_games/releases/download/v{VERSION}-spellwheels/spellwheels-{VERSION}-py3-none-any.whl"
+  }
+]
