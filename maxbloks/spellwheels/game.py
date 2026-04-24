@@ -3,6 +3,18 @@
 
 """SpellWheels game controller.
 
+Initialisation sequence (must match this order to avoid segfaults on
+handheld targets with KMSDRM/mali drivers):
+
+  1. compat_sdl.init_display()  -- sets SDL_VIDEODRIVER env-var, calls
+                                    pygame.display.quit/init internally.
+  2. pygame.init()              -- safe to call after display is up.
+  3. pygame.font.init()         -- font subsystem; must precede Font().
+  4. pygame.joystick.init()     -- joystick subsystem.
+  5. Font objects created       -- only after font subsystem is running.
+
+Do NOT call pygame.init() before compat_sdl.init_display().
+
 State machine:
 
     MENU ---start--> PLAYING <---resume--- PAUSED
@@ -22,8 +34,10 @@ the options/pause menu where legibility trumps the icon-only rule.
 
 import enum
 import math
+import sys
 import pygame
 
+from maxbloks.spellwheels import compat_sdl
 from maxbloks.spellwheels import constants
 from maxbloks.spellwheels import entities
 from maxbloks.spellwheels import utils
@@ -40,13 +54,46 @@ class GameState(enum.Enum):
 
 
 class SpellWheelsGame:
-    """Main game controller with state machine, update and draw loops."""
+    """Main game controller with state machine, update and draw loops.
 
-    def __init__(self, surface_size=None):
-        size = surface_size or (constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT)
-        self.screen_width, self.screen_height = size
+    Follows the MathWheelGame pattern: the constructor owns the full
+    pygame initialisation sequence so that main.py needs no pygame calls.
+    """
+
+    def __init__(self):
+        # 1. Initialise the display via compat_sdl first.
+        #    This sets SDL_VIDEODRIVER (and other env-vars) before pygame
+        #    touches the hardware -- critical on KMSDRM/mali handhelds.
+        screen, display_info = compat_sdl.init_display(
+            size=(constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT),
+            fullscreen=constants.FULLSCREEN,
+            vsync=True,
+        )
+
+        # 2. Now that the display driver is chosen and the window exists,
+        #    it is safe to call the blanket pygame.init().
+        #pygame.init()
+        pygame.font.init()
+        pygame.joystick.init()
+
+        self.screen = screen
+        self.screen_width = display_info["width"]
+        self.screen_height = display_info["height"]
+
+        pygame.display.set_caption("SPELLWHEELS")
+        self.clock = pygame.time.Clock()
+
+        # Joystick (optional)
+        self._joystick = None
+        if pygame.joystick.get_count() > 0:
+            self._joystick = pygame.joystick.Joystick(0)
+            self._joystick.init()
+
         self.state = GameState.MENU
 
+        # 3. Font objects only after pygame.font.init().
+        #    Do NOT call set_bold() -- it modifies the internal FreeType
+        #    object and can segfault on some platform builds.
         self._init_fonts()
         self._init_surfaces()
         self._init_state()
@@ -68,10 +115,8 @@ class SpellWheelsGame:
         self.font_feedback = pygame.font.Font(
             None, constants.FONT_SIZE_FEEDBACK
         )
-        # Try to enable bold for the wheels (block-letter style).
-        self.font_wheel.set_bold(True)
-        self.font_title.set_bold(True)
-        self.font_feedback.set_bold(True)
+        # Note: set_bold() is intentionally omitted -- it can segfault on
+        # some pygame-ce + FreeType builds present on handheld devices.
 
     def _init_surfaces(self):
         self.bg_surface = pygame.Surface(
@@ -91,7 +136,9 @@ class SpellWheelsGame:
             saved["last_level"], 0, len(self.levels) - 1
         )
         word_start = utils.clamp(
-            saved["last_word_index"], 0, self.levels[self.level_index].word_count - 1
+            saved["last_word_index"],
+            0,
+            self.levels[self.level_index].word_count - 1,
         )
         self.score.total_stars = saved["total_stars"]
         self.runner = entities.LevelRunner(
@@ -100,20 +147,36 @@ class SpellWheelsGame:
 
         self._advance_timer = 0
         self._menu_cursor = constants.MENU_ITEM_PLAY
-        self._has_saved_game = saved["total_stars"] > 0 or saved["last_word_index"] > 0
+        self._has_saved_game = (
+            saved["total_stars"] > 0 or saved["last_word_index"] > 0
+        )
 
         self._last_ticks = pygame.time.get_ticks()
-        # Key-repeat bookkeeping for held buttons on gameplay screen
-        self._repeat_dir_x = 0
-        self._repeat_dir_y = 0
-        self._repeat_timer = 0
 
         # Stars awarded for the most recent word (shown during feedback)
         self._last_stars_awarded = 0
 
-        # Cached per-word wheel layout
+        # Cached per-word wheel layout (pygame.Rect list)
         self._wheel_rects = []
         self._build_wheel_layout()
+
+    # ------------------------------------------------------------------
+    # Main loop  (called by main.py)
+    # ------------------------------------------------------------------
+    def run(self, input_handler):
+        """Main game loop."""
+        running = True
+        while running:
+            inp = input_handler.update()
+            running = self.update(inp)
+
+            self.screen.fill((0, 0, 0))
+            self.draw(self.screen)
+            pygame.display.flip()
+            self.clock.tick(constants.TARGET_FPS)
+
+        pygame.quit()
+        sys.exit(0)
 
     # ------------------------------------------------------------------
     # Public API
@@ -163,9 +226,13 @@ class SpellWheelsGame:
     # ------------------------------------------------------------------
     def _update_menu(self, inp):
         if inp.spin_up:
-            self._menu_cursor = (self._menu_cursor - 1) % constants.MENU_ITEM_COUNT
+            self._menu_cursor = (
+                self._menu_cursor - 1
+            ) % constants.MENU_ITEM_COUNT
         if inp.spin_down:
-            self._menu_cursor = (self._menu_cursor + 1) % constants.MENU_ITEM_COUNT
+            self._menu_cursor = (
+                self._menu_cursor + 1
+            ) % constants.MENU_ITEM_COUNT
 
         if inp.submit:
             self._activate_menu_item()
@@ -176,7 +243,6 @@ class SpellWheelsGame:
 
     def _activate_menu_item(self):
         if self._menu_cursor == constants.MENU_ITEM_PLAY:
-            # New game from the beginning
             self.score.reset()
             self.level_index = 0
             self.runner = entities.LevelRunner(self.levels[0], 0)
@@ -193,22 +259,17 @@ class SpellWheelsGame:
             self._has_saved_game = False
             self._build_wheel_layout()
         elif self._menu_cursor == constants.MENU_ITEM_QUIT:
-            # Request quit via a sentinel -- the main loop picks this up
-            # by observing update() returning False next call.
             pygame.event.post(pygame.event.Event(pygame.QUIT))
 
     def _update_playing(self, inp, dt):
-        # Global transitions first
         if inp.pause:
             self.state = GameState.PAUSED
             return
 
         if inp.map_view:
-            # Level/world map currently just returns to menu
             self.state = GameState.MENU
             return
 
-        # Feedback in progress: only allow pause
         if self.feedback.active:
             self._advance_timer -= dt
             if self._advance_timer <= 0:
@@ -218,39 +279,32 @@ class SpellWheelsGame:
         puzzle = self.runner.puzzle
         puzzle.update(dt)
 
-        # Cursor movement
         if inp.move_left:
             puzzle.move_left()
         if inp.move_right:
             puzzle.move_right()
 
-        # Wheel spinning
         if inp.spin_up:
             puzzle.spin_up()
         if inp.spin_down:
             puzzle.spin_down()
 
-        # Clear / undo
         if inp.clear:
             puzzle.clear_active()
 
-        # Hint
         if inp.hint:
             puzzle.trigger_hint()
 
-        # Submit
         if inp.submit:
             self._submit_word()
 
     def _update_paused(self, inp):
-        # Any of: pause, submit, clear -> resume
         if inp.pause or inp.submit:
             self.state = GameState.PLAYING
         elif inp.map_view:
             self.state = GameState.MENU
 
     def _update_level_complete(self, inp, dt):
-        # Auto-advance after the display duration, or on submit
         if inp.submit or inp.pause or not self.feedback.active:
             self._begin_next_level_or_finish()
 
@@ -280,6 +334,7 @@ class SpellWheelsGame:
         else:
             self.runner.advance()
             self.score.start_word()
+            self._build_wheel_layout()
             self._save_progress()
 
     def _finish_level(self):
@@ -301,7 +356,9 @@ class SpellWheelsGame:
 
     def _save_progress(self, level_completed=False):
         data = {
-            "levels_completed": self.level_index + (1 if level_completed else 0),
+            "levels_completed": self.level_index + (
+                1 if level_completed else 0
+            ),
             "total_stars": self.score.total_stars,
             "last_level": self.level_index,
             "last_word_index": self.runner.word_index,
@@ -313,7 +370,7 @@ class SpellWheelsGame:
     # Layout helpers
     # ------------------------------------------------------------------
     def _build_wheel_layout(self):
-        """Recompute rectangles for each wheel in the current word."""
+        """Recompute rects for each wheel in the current word."""
         word = self.runner.puzzle.target
         n = len(word)
         total_w = n * constants.WHEEL_WIDTH + (n - 1) * constants.WHEEL_SPACING
@@ -321,7 +378,9 @@ class SpellWheelsGame:
         y = int(self.screen_height * constants.WHEELS_Y_RATIO)
         rects = []
         for i in range(n):
-            x = start_x + i * (constants.WHEEL_WIDTH + constants.WHEEL_SPACING)
+            x = start_x + i * (
+                constants.WHEEL_WIDTH + constants.WHEEL_SPACING
+            )
             rect = pygame.Rect(
                 x,
                 y - constants.WHEEL_HEIGHT // 2,
@@ -357,8 +416,10 @@ class SpellWheelsGame:
         for idx, label in enumerate(items):
             y = 200 + idx * 55
             selected = idx == self._menu_cursor
-            disabled = (idx == constants.MENU_ITEM_RESUME
-                        and not self._has_saved_game)
+            disabled = (
+                idx == constants.MENU_ITEM_RESUME
+                and not self._has_saved_game
+            )
             self._draw_menu_item(screen, cx, y, label, selected, disabled)
 
         self._draw_centered_text(
@@ -420,12 +481,6 @@ class SpellWheelsGame:
             )
 
     def _draw_stars_hud(self, screen):
-        """Render the running star total as star icons + a small number.
-
-        The number uses block digits and is the only non-settings text
-        rendered during gameplay; we limit it to the session total so it
-        never dominates the screen.
-        """
         x = 12
         y = constants.STAR_BAR_Y
         star_cx = x + 16
@@ -433,15 +488,15 @@ class SpellWheelsGame:
         scale = 1.0
         if self.star_anim.active:
             scale = self.star_anim.scale
-        self._draw_star_icon(screen, star_cx, star_cy, 14 * scale,
-                             constants.STAR_COLOR)
+        self._draw_star_icon(
+            screen, star_cx, star_cy, 14 * scale, constants.STAR_COLOR
+        )
         count_surf = self.font_hud.render(
             str(self.score.total_stars), True, constants.DARK_GRAY
         )
         screen.blit(count_surf, (star_cx + 18, y + 4))
 
     def _draw_icon(self, screen):
-        """Draw the big cartoon icon representing the word."""
         cx = self.screen_width // 2
         cy = int(self.screen_height * constants.ICON_Y_RATIO)
         icon_tag = self.runner.current_word_entry.icon_tag
@@ -455,30 +510,34 @@ class SpellWheelsGame:
             wheel = puzzle.wheels[idx]
             active = idx == puzzle.active_index
             shake = puzzle.shake_offset(idx, now)
-            self._draw_single_wheel(screen, rect, wheel, active, shake, puzzle, idx)
+            self._draw_single_wheel(
+                screen, rect, wheel, active, shake, puzzle, idx
+            )
 
-        # Hint: highlight the first letter of the target above wheel 0
         if puzzle.hint_active and len(self._wheel_rects) > 0:
             self._draw_hint_bubble(screen, puzzle.hint_letter)
 
     def _draw_single_wheel(self, screen, rect, wheel, active, shake_offset,
-                           puzzle, idx):
+                            puzzle, idx):
         drum_rect = rect.move(shake_offset, 0)
         border = (
             constants.WHEEL_ACTIVE_BORDER if active
             else constants.WHEEL_BORDER
         )
         border_width = 4 if active else 3
-        pygame.draw.rect(screen, constants.WHEEL_BG, drum_rect,
-                         border_radius=12)
-        pygame.draw.rect(screen, border, drum_rect, border_width,
-                         border_radius=12)
+        pygame.draw.rect(
+            screen, constants.WHEEL_BG, drum_rect, border_radius=12
+        )
+        pygame.draw.rect(
+            screen, border, drum_rect, border_width, border_radius=12
+        )
 
-        # Glow effect on active wheel
         if active:
             glow = drum_rect.inflate(8, 8)
-            pygame.draw.rect(screen, constants.WHEEL_ACTIVE_BORDER, glow,
-                             2, border_radius=14)
+            pygame.draw.rect(
+                screen, constants.WHEEL_ACTIVE_BORDER, glow,
+                2, border_radius=14
+            )
 
         cx = drum_rect.centerx
         cy = drum_rect.centery
@@ -495,7 +554,6 @@ class SpellWheelsGame:
             surf = font.render(letter, True, color)
             screen.blit(surf, surf.get_rect(center=(cx, ny)))
 
-        # Little arrow glyphs above/below the active wheel
         if active:
             self._draw_arrow(screen, cx, drum_rect.top - 8, up=True)
             self._draw_arrow(screen, cx, drum_rect.bottom + 8, up=False)
@@ -503,27 +561,28 @@ class SpellWheelsGame:
     def _draw_hint_bubble(self, screen, letter):
         rect = self._wheel_rects[0]
         bubble = pygame.Rect(rect.left, rect.top - 56, rect.width, 44)
-        pygame.draw.rect(screen, constants.HINT_COLOR, bubble,
-                         border_radius=10)
-        pygame.draw.rect(screen, constants.PANEL_BORDER, bubble, 2,
-                         border_radius=10)
+        pygame.draw.rect(
+            screen, constants.HINT_COLOR, bubble, border_radius=10
+        )
+        pygame.draw.rect(
+            screen, constants.PANEL_BORDER, bubble, 2, border_radius=10
+        )
         surf = self.font_wheel_dim.render(letter, True, constants.WHITE)
         screen.blit(surf, surf.get_rect(center=bubble.center))
 
     def _draw_hud_icons(self, screen):
-        """Tiny icon hints at the bottom for submit/clear/hint."""
-        y = self.screen_height - 28
-        icon_size = 18
         gap = 60
         cx = self.screen_width // 2
-        # Submit (A) -- green check
-        self._draw_icon_button(screen, cx - gap, y,
-                               constants.CORRECT_COLOR, "check")
-        # Clear (B) -- red cross
-        self._draw_icon_button(screen, cx, y, constants.WRONG_COLOR, "x")
-        # Hint (Y) -- yellow bulb
-        self._draw_icon_button(screen, cx + gap, y, constants.HINT_COLOR,
-                               "bulb")
+        y = self.screen_height - 28
+        self._draw_icon_button(
+            screen, cx - gap, y, constants.CORRECT_COLOR, "check"
+        )
+        self._draw_icon_button(
+            screen, cx, y, constants.WRONG_COLOR, "x"
+        )
+        self._draw_icon_button(
+            screen, cx + gap, y, constants.HINT_COLOR, "bulb"
+        )
 
     def _draw_icon_button(self, screen, cx, cy, color, glyph):
         r = 14
@@ -533,40 +592,54 @@ class SpellWheelsGame:
             pts = [(cx - 6, cy), (cx - 1, cy + 5), (cx + 7, cy - 5)]
             pygame.draw.lines(screen, constants.WHITE, False, pts, 3)
         elif glyph == "x":
-            pygame.draw.line(screen, constants.WHITE,
-                             (cx - 5, cy - 5), (cx + 5, cy + 5), 3)
-            pygame.draw.line(screen, constants.WHITE,
-                             (cx - 5, cy + 5), (cx + 5, cy - 5), 3)
+            pygame.draw.line(
+                screen, constants.WHITE,
+                (cx - 5, cy - 5), (cx + 5, cy + 5), 3
+            )
+            pygame.draw.line(
+                screen, constants.WHITE,
+                (cx - 5, cy + 5), (cx + 5, cy - 5), 3
+            )
         elif glyph == "bulb":
             pygame.draw.circle(screen, constants.WHITE, (cx, cy - 1), 5)
-            pygame.draw.rect(screen, constants.WHITE,
-                             pygame.Rect(cx - 3, cy + 3, 6, 4))
+            pygame.draw.rect(
+                screen, constants.WHITE,
+                pygame.Rect(cx - 3, cy + 3, 6, 4)
+            )
 
     def _draw_correct_feedback(self, screen):
         cx = self.screen_width // 2
         cy = int(self.screen_height * 0.50)
         alpha = self.feedback.alpha
-        # Large check-mark
         check = pygame.Surface((120, 120), pygame.SRCALPHA)
-        pygame.draw.circle(check, (*constants.CORRECT_COLOR, int(220 * alpha)),
-                           (60, 60), 50)
+        pygame.draw.circle(
+            check,
+            (*constants.CORRECT_COLOR, int(220 * alpha)),
+            (60, 60), 50
+        )
         pts = [(30, 62), (50, 82), (90, 40)]
         pygame.draw.lines(
-            check, (*constants.WHITE, int(255 * alpha)), False, pts, 8
+            check,
+            (*constants.WHITE, int(255 * alpha)),
+            False, pts, 8
         )
         screen.blit(check, check.get_rect(center=(cx, cy)))
-        # Stars earned flash below
-        self._draw_stars_row(screen, cx, cy + 90, self._last_stars_awarded,
-                             alpha=alpha)
+        self._draw_stars_row(
+            screen, cx, cy + 90, self._last_stars_awarded, alpha=alpha
+        )
 
     def _draw_stars_row(self, screen, cx, cy, count, alpha=1.0):
         gap = 40
         total_w = gap * (constants.MAX_STARS_PER_WORD - 1)
         start_x = cx - total_w // 2
         for i in range(constants.MAX_STARS_PER_WORD):
-            color = constants.STAR_COLOR if i < count else constants.STAR_EMPTY_COLOR
-            self._draw_star_icon(screen, start_x + i * gap, cy, 18, color,
-                                 alpha=alpha)
+            color = (
+                constants.STAR_COLOR if i < count
+                else constants.STAR_EMPTY_COLOR
+            )
+            self._draw_star_icon(
+                screen, start_x + i * gap, cy, 18, color, alpha=alpha
+            )
 
     # ------------------------------------------------------------------
     # Drawing -- pause / level complete / game over
@@ -591,15 +664,11 @@ class SpellWheelsGame:
     def _draw_level_complete(self, screen):
         screen.blit(self.bg_surface, (0, 0))
         cx = self.screen_width // 2
-
-        # Big sticker/icon representing the level theme
         cy = int(self.screen_height * 0.35)
         _draw_sticker(screen, cx, cy, 90, constants.YELLOW)
-
-        # Stars row celebrating performance
-        self._draw_stars_row(screen, cx, cy + 130, constants.MAX_STARS_PER_WORD)
-
-        # Confetti-like dots
+        self._draw_stars_row(
+            screen, cx, cy + 130, constants.MAX_STARS_PER_WORD
+        )
         import random
         random.seed(self.level_index)
         for _ in range(40):
@@ -615,22 +684,29 @@ class SpellWheelsGame:
         screen.blit(self.bg_surface, (0, 0))
         cx = self.screen_width // 2
         cy = self.screen_height // 2
-        # A giant trophy icon (stacked rects + circle = cup)
         pygame.draw.circle(screen, constants.YELLOW, (cx, cy - 40), 48)
         pygame.draw.circle(
             screen, constants.ICON_OUTLINE, (cx, cy - 40), 48, 4
         )
-        pygame.draw.rect(screen, constants.YELLOW,
-                         pygame.Rect(cx - 30, cy, 60, 30))
-        pygame.draw.rect(screen, constants.ICON_OUTLINE,
-                         pygame.Rect(cx - 30, cy, 60, 30), 4)
-        pygame.draw.rect(screen, constants.BROWN,
-                         pygame.Rect(cx - 40, cy + 30, 80, 14))
-        pygame.draw.rect(screen, constants.ICON_OUTLINE,
-                         pygame.Rect(cx - 40, cy + 30, 80, 14), 4)
-
-        # Final star total
-        self._draw_stars_row(screen, cx, cy + 90, constants.MAX_STARS_PER_WORD)
+        pygame.draw.rect(
+            screen, constants.YELLOW,
+            pygame.Rect(cx - 30, cy, 60, 30)
+        )
+        pygame.draw.rect(
+            screen, constants.ICON_OUTLINE,
+            pygame.Rect(cx - 30, cy, 60, 30), 4
+        )
+        pygame.draw.rect(
+            screen, constants.BROWN,
+            pygame.Rect(cx - 40, cy + 30, 80, 14)
+        )
+        pygame.draw.rect(
+            screen, constants.ICON_OUTLINE,
+            pygame.Rect(cx - 40, cy + 30, 80, 14), 4
+        )
+        self._draw_stars_row(
+            screen, cx, cy + 90, constants.MAX_STARS_PER_WORD
+        )
 
     # ------------------------------------------------------------------
     # Low-level drawing helpers
@@ -664,7 +740,9 @@ class SpellWheelsGame:
         for i in range(10):
             angle = -math.pi / 2 + i * math.pi / 5
             r = size if i % 2 == 0 else size * 0.45
-            pts.append((cx + math.cos(angle) * r, cy + math.sin(angle) * r))
+            pts.append(
+                (cx + math.cos(angle) * r, cy + math.sin(angle) * r)
+            )
         if alpha >= 1.0:
             pygame.draw.polygon(screen, color, pts)
             pygame.draw.polygon(screen, constants.ICON_OUTLINE, pts, 2)
@@ -684,10 +762,7 @@ class SpellWheelsGame:
 
 
 # ----------------------------------------------------------------------
-# Icon drawers -- simple cartoon shapes for each word.
-#
-# These are separate module-level functions so they can be registered in
-# the _ICON_DRAWERS table below and easily extended with new words.
+# Icon drawers
 # ----------------------------------------------------------------------
 
 _ICON_RADIUS = 70
@@ -700,18 +775,16 @@ def _fill_circle(surface, cx, cy, radius, color):
 
 def _fill_rect(surface, rect, color):
     pygame.draw.rect(surface, color, rect, border_radius=8)
-    pygame.draw.rect(surface, constants.ICON_OUTLINE, rect, 3, border_radius=8)
+    pygame.draw.rect(surface, constants.ICON_OUTLINE, rect, 3,
+                     border_radius=8)
 
 
 def _draw_icon_default(surface, cx, cy):
     _fill_circle(surface, cx, cy, _ICON_RADIUS, constants.LIGHT_GRAY)
-    q = surface.subsurface  # noqa: F841 placeholder
 
 
 def _draw_icon_dog(surface, cx, cy):
-    # Body
     _fill_circle(surface, cx, cy + 10, 60, constants.BROWN)
-    # Ears
     pygame.draw.ellipse(
         surface, constants.BROWN,
         pygame.Rect(cx - 60, cy - 50, 34, 50)
@@ -728,16 +801,13 @@ def _draw_icon_dog(surface, cx, cy):
         surface, constants.ICON_OUTLINE,
         pygame.Rect(cx + 26, cy - 50, 34, 50), 3
     )
-    # Eyes
     pygame.draw.circle(surface, constants.BLACK, (cx - 18, cy), 5)
     pygame.draw.circle(surface, constants.BLACK, (cx + 18, cy), 5)
-    # Nose
     pygame.draw.circle(surface, constants.BLACK, (cx, cy + 20), 6)
 
 
 def _draw_icon_cat(surface, cx, cy):
     _fill_circle(surface, cx, cy + 10, 58, constants.GRAY)
-    # Triangle ears
     pygame.draw.polygon(
         surface, constants.GRAY,
         [(cx - 50, cy - 20), (cx - 30, cy - 60), (cx - 10, cy - 20)]
@@ -765,7 +835,6 @@ def _draw_icon_cat(surface, cx, cy):
 
 
 def _draw_icon_fish(surface, cx, cy):
-    # Body
     pygame.draw.ellipse(
         surface, constants.BLUE,
         pygame.Rect(cx - 70, cy - 35, 120, 70)
@@ -774,7 +843,6 @@ def _draw_icon_fish(surface, cx, cy):
         surface, constants.ICON_OUTLINE,
         pygame.Rect(cx - 70, cy - 35, 120, 70), 3
     )
-    # Tail
     pygame.draw.polygon(
         surface, constants.BLUE,
         [(cx + 40, cy), (cx + 80, cy - 30), (cx + 80, cy + 30)]
@@ -789,12 +857,10 @@ def _draw_icon_fish(surface, cx, cy):
 
 def _draw_icon_apple(surface, cx, cy):
     _fill_circle(surface, cx, cy + 10, 55, constants.RED)
-    # Stem
     pygame.draw.rect(
         surface, constants.BROWN,
         pygame.Rect(cx - 3, cy - 50, 6, 18)
     )
-    # Leaf
     pygame.draw.ellipse(
         surface, constants.GREEN,
         pygame.Rect(cx + 3, cy - 52, 28, 14)
@@ -806,14 +872,15 @@ def _draw_icon_apple(surface, cx, cy):
 
 
 def _draw_icon_sun(surface, cx, cy):
-    # Rays
     for i in range(12):
         angle = i * (math.pi * 2 / 12)
         x1 = cx + math.cos(angle) * 50
         y1 = cy + math.sin(angle) * 50
         x2 = cx + math.cos(angle) * 80
         y2 = cy + math.sin(angle) * 80
-        pygame.draw.line(surface, constants.ORANGE, (x1, y1), (x2, y2), 6)
+        pygame.draw.line(
+            surface, constants.ORANGE, (x1, y1), (x2, y2), 6
+        )
     _fill_circle(surface, cx, cy, 45, constants.YELLOW)
     pygame.draw.circle(surface, constants.BLACK, (cx - 12, cy - 5), 4)
     pygame.draw.circle(surface, constants.BLACK, (cx + 12, cy - 5), 4)
@@ -825,7 +892,6 @@ def _draw_icon_sun(surface, cx, cy):
 
 def _draw_icon_moon(surface, cx, cy):
     _fill_circle(surface, cx, cy, 55, constants.LIGHT_GRAY)
-    # Crescent cut-out
     pygame.draw.circle(
         surface, constants.BG_GRADIENT_TOP, (cx + 20, cy - 5), 45
     )
@@ -846,7 +912,6 @@ def _draw_icon_star(surface, cx, cy):
 
 
 def _draw_icon_tree(surface, cx, cy):
-    # Trunk
     pygame.draw.rect(
         surface, constants.BROWN,
         pygame.Rect(cx - 10, cy + 20, 20, 50)
@@ -855,11 +920,12 @@ def _draw_icon_tree(surface, cx, cy):
         surface, constants.ICON_OUTLINE,
         pygame.Rect(cx - 10, cy + 20, 20, 50), 3
     )
-    # Foliage as three overlapping circles
     pygame.draw.circle(surface, constants.GREEN, (cx, cy - 20), 40)
     pygame.draw.circle(surface, constants.GREEN, (cx - 28, cy), 32)
     pygame.draw.circle(surface, constants.GREEN, (cx + 28, cy), 32)
-    pygame.draw.circle(surface, constants.ICON_OUTLINE, (cx, cy - 20), 40, 3)
+    pygame.draw.circle(
+        surface, constants.ICON_OUTLINE, (cx, cy - 20), 40, 3
+    )
     pygame.draw.circle(
         surface, constants.ICON_OUTLINE, (cx - 28, cy), 32, 3
     )
@@ -876,7 +942,6 @@ def _draw_icon_house(surface, cx, cy):
     pygame.draw.polygon(surface, constants.ICON_OUTLINE, roof, 3)
     door = pygame.Rect(cx - 15, cy + 25, 30, 45)
     _fill_rect(surface, door, constants.BROWN)
-    # Window
     win = pygame.Rect(cx - 48, cy + 12, 20, 20)
     _fill_rect(surface, win, constants.BLUE)
 
@@ -886,13 +951,12 @@ def _draw_icon_car(surface, cx, cy):
     _fill_rect(surface, body, constants.RED)
     cabin = pygame.Rect(cx - 45, cy - 35, 70, 35)
     _fill_rect(surface, cabin, constants.BLUE)
-    # Wheels
     _fill_circle(surface, cx - 40, cy + 40, 16, constants.DARK_GRAY)
     _fill_circle(surface, cx + 40, cy + 40, 16, constants.DARK_GRAY)
 
 
 def _draw_sticker(surface, cx, cy, size, color):
-    """Big celebratory sticker used on level-complete screen."""
+    """Celebratory burst sticker for level-complete screen."""
     pts = []
     for i in range(20):
         angle = i * (math.pi * 2 / 20)
@@ -900,7 +964,6 @@ def _draw_sticker(surface, cx, cy, size, color):
         pts.append((cx + math.cos(angle) * r, cy + math.sin(angle) * r))
     pygame.draw.polygon(surface, color, pts)
     pygame.draw.polygon(surface, constants.ICON_OUTLINE, pts, 3)
-    # Smiley face
     pygame.draw.circle(surface, constants.BLACK, (cx - 20, cy - 10), 6)
     pygame.draw.circle(surface, constants.BLACK, (cx + 20, cy - 10), 6)
     pygame.draw.arc(
