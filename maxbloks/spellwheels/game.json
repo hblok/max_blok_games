@@ -8,8 +8,6 @@
   "entryPoint": "maxbloks/spellwheels/main.py",
   "startScript": "SpellWheels.sh",
   "icon": "SpellWheels.png",
-  "category": "education",
-  "tags": ["education", "spelling", "children", "german", "handheld", "kids"],
   "downloadUrl": "https://github.com/hblok/max_blok_games/releases/download/v{VERSION}-spellwheels/spellwheels-{VERSION}-py3-none-any.whl"
   }
 ]
