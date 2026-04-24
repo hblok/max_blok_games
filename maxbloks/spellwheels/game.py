@@ -72,7 +72,7 @@ class SpellWheelsGame:
 
         # 2. Now that the display driver is chosen and the window exists,
         #    it is safe to call the blanket pygame.init().
-        pygame.init()
+        #pygame.init()
         pygame.font.init()
         pygame.joystick.init()
 
