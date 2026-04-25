@@ -61,20 +61,31 @@ class SpellWheelsGame:
     """
 
     def __init__(self):
+# YOU MUST CREATE A WINDOW BEFORE CALLING GET()
         # 1. Initialise the display via compat_sdl first.
         #    This sets SDL_VIDEODRIVER (and other env-vars) before pygame
         #    touches the hardware -- critical on KMSDRM/mali handhelds.
+        
+        #screen = None
+        #display_info = None
         screen, display_info = compat_sdl.init_display(
             size=(constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT),
             fullscreen=constants.FULLSCREEN,
             vsync=True,
         )
+        print("screen: ", str(screen))
+        print("display_info: ", str(display_info))
+        
+        pygame.event.pump() # Force internal SDL state sync
+        pygame.time.delay(100) # Give the OS a moment to catch up
 
         # 2. Now that the display driver is chosen and the window exists,
         #    it is safe to call the blanket pygame.init().
-        #pygame.init()
-        pygame.font.init()
+        pygame.init()
+        
         pygame.joystick.init()
+        pygame.font.init()
+
 
         self.screen = screen
         self.screen_width = display_info["width"]
@@ -125,7 +136,10 @@ class SpellWheelsGame:
         self._render_gradient_bg(self.bg_surface)
 
     def _init_state(self):
+        #return
         self.levels = utils.build_default_levels()
+        return
+
         self.score = utils.ScoreTracker()
         self.saver = utils.ProgressSaver()
         self.feedback = entities.FeedbackEffect()
@@ -167,13 +181,17 @@ class SpellWheelsGame:
         """Main game loop."""
         running = True
         while running:
+            print("game.run() - 1.")
             inp = input_handler.update()
+            print("game.run() - 2.")            
             running = self.update(inp)
+            print("game.run() - 3.")            
 
             self.screen.fill((0, 0, 0))
             self.draw(self.screen)
             pygame.display.flip()
             self.clock.tick(constants.TARGET_FPS)
+            print("game.run() - 10.")
 
         pygame.quit()
         sys.exit(0)
@@ -332,9 +350,13 @@ class SpellWheelsGame:
         if self.runner.is_last_word:
             self._finish_level()
         else:
+            print("_after_correct_advance - 1.")
             self.runner.advance()
+            print("_after_correct_advance - 2.")            
             self.score.start_word()
+            print("_after_correct_advance - 3.")            
             self._build_wheel_layout()
+            print("_after_correct_advance - 4.")            
             self._save_progress()
 
     def _finish_level(self):

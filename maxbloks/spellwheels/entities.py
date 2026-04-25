@@ -292,6 +292,7 @@ class LevelRunner:
     """Drives progression through the words of one level."""
 
     def __init__(self, level, start_word_index=0):
+        print("LevelRunner")
         self.level = level
         self.word_index = max(0, min(start_word_index, level.word_count - 1))
         self.puzzle = PuzzleState(self._current_word().word)
