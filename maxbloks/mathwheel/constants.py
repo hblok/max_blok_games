@@ -6,7 +6,7 @@
 # Screen settings
 SCREEN_WIDTH = 640
 SCREEN_HEIGHT = 480
-FULLSCREEN = True
+FULLSCREEN = False
 TARGET_FPS = 60
 
 # Colors (RGB tuples)

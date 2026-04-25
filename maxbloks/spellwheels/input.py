@@ -19,6 +19,7 @@ Controls (from design spec):
 The analog-stick deadzone is 0.2; diagonals are normalized by 0.707.
 """
 
+import time
 import pygame
 
 from maxbloks.spellwheels import constants
@@ -70,8 +71,15 @@ class InputHandler:
     def update(self):
         state = InputState()
 
-        for event in pygame.event.get():
-            self._handle_event(event, state)
+        import faulthandler
+        faulthandler.enable()
+
+        if pygame.event and pygame.event.get:
+            time.sleep(1)
+
+            events = pygame.event.get()
+            for event in events:
+                self._handle_event(event, state)
 
         self._read_joystick_axes(state)
         return state

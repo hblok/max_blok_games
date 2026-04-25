@@ -19,7 +19,10 @@ segmentation fault on handheld (KMSDRM/mali) targets.
 """
 
 import sys
+import time
+import pygame
 
+#from maxbloks.spellwheels import compat_sdl
 from maxbloks.spellwheels.game import SpellWheelsGame
 from maxbloks.spellwheels.input import InputHandler
 
@@ -27,9 +30,24 @@ from maxbloks.spellwheels.input import InputHandler
 def main():
     # SpellWheelsGame handles all pygame initialisation internally,
     # mirroring the MathWheelGame / GameFramework pattern.
+
+    #screen, display_info = compat_sdl.init_display(
+    #    size=(640, 480),
+    #    fullscreen=False,
+    #    vsync=True,
+    #)
+
+    #pygame.init()
+    #screen = pygame.display.set_mode((800, 600)) 
+    #pygame.display.init()
+    #screen = pygame.display.set_mode((800, 600))
+    pygame.font.init()
+    
     game = SpellWheelsGame()
-    input_handler = InputHandler()
-    game.run(input_handler)
+    #input_handler = InputHandler()
+    pygame.event.pump() 
+    pygame.event.get()
+    #game.run(input_handler)
 
 
 if __name__ == "__main__":

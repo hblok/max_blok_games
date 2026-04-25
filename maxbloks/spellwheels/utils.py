@@ -33,15 +33,15 @@ class WordEntry:
         self.icon_tag = icon_tag
         self.theme = theme
 
-    @property
-    def length(self):
-        return len(self.word)
+    #@property
+    #def length(self):
+    #    return len(self.word)
 
-    def letter_at(self, index):
-        return self.word[index]
+    #def letter_at(self, index):
+    #    return self.word[index]
 
-    def __repr__(self):
-        return f"WordEntry({self.word!r}, icon={self.icon_tag!r})"
+    #def __repr__(self):
+    #    return f"WordEntry({self.word!r}, icon={self.icon_tag!r})"
 
 
 class Level:
@@ -53,16 +53,22 @@ class Level:
         self.title_icon = title_icon
         self.words = list(words)
 
-    @property
-    def word_count(self):
-        return len(self.words)
+    #@property
+    #def word_count(self):
+    #    return len(self.words)
 
-    def word(self, index):
-        return self.words[index]
+    #def word(self, index):
+    #    return self.words[index]
 
 
 def build_default_levels():
     """Return the starter level list as described in the design document."""
+    
+    WordEntry("HUND", "dog", constants.THEME_ANIMALS)
+    WordEntry("KATZE", "cat", constants.THEME_ANIMALS)
+    WordEntry("FISCH", "fish", constants.THEME_ANIMALS)
+            
+    #return    
     level1 = Level(
         level_id=0,
         theme=constants.THEME_ANIMALS,
@@ -70,9 +76,10 @@ def build_default_levels():
         words=[
             WordEntry("HUND", "dog", constants.THEME_ANIMALS),
             WordEntry("KATZE", "cat", constants.THEME_ANIMALS),
-            WordEntry("FISCH", "fish", constants.THEME_ANIMALS),
+            WordEntry("FISCH", "fish", constants.THEME_ANIMALS)
         ],
     )
+    return    
     level2 = Level(
         level_id=1,
         theme=constants.THEME_FRUITS,
