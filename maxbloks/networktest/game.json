@@ -1,0 +1,6 @@
+{
+    "name": "Network Test",
+    "description": "LAN device discovery and pairing utility for handheld consoles",
+    "author": "H. Blok",
+    "version": "0.0.1"
+}
