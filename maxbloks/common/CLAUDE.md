@@ -69,6 +69,28 @@ Using ctypes to call SDL2 functions directly can cause segfaults when the SDL li
 ### Renderer Introspection
 On pygame-ce, the module can query the renderer name via `pygame._sdl2.video` without creating extra SDL objects or using ctypes.
 
+## `info_dict` Field Reliability
+
+The dict returned by `init_display()` contains:
+
+| Field | Type | Reliability |
+|-------|------|-------------|
+| `driver` | str | Always populated — the SDL video driver that succeeded |
+| `renderer` | str | **pygame-ce only** — empty string `""` on standard pygame |
+| `size` | tuple | Always populated — actual physical display size |
+| `width` | int | Always populated |
+| `height` | int | Always populated |
+
+Do not rely on `renderer` being non-empty unless you have confirmed the runtime uses pygame-ce.
+
+## Platform Notes
+
+### Wayland
+The `wayland` driver attempt only succeeds when `WAYLAND_DISPLAY` is set in the environment. If that variable is absent, SDL silently falls through to the next driver in the list. On pure Wayland desktops without XWayland you may need to set `WAYLAND_DISPLAY=wayland-0` before launching.
+
+### Default Resolution
+The `init_display()` signature defaults to `size=(1280, 720)` as a safe desktop fallback. Games running at 640×480 or 800×600 must pass their own `size` explicitly — they must not rely on the default.
+
 ## Dependencies
 - Python 3.7+
 - pygame 2.0+

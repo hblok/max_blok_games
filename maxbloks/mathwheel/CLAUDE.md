@@ -238,5 +238,13 @@ The architecture supports adding:
 - **Themes/Skins**: Replace color constants or add theme selection
 - **Statistics**: Extend DifficultyManager to track per-operation accuracy
 
+## Invariants / What NOT to Change
+
+- **`compat_sdl.py` must remain a symlink** to `../common/compat_sdl.py`. Do not copy it.
+- **Input model is discrete, not continuous**. The framework was adapted from the fish `GameFramework` specifically to emit single-step events rather than held-key movement vectors. Converting it back to a continuous model would make the number wheel uncontrollable on gamepad.
+- **No negative answers** and **no fractional answers**. The subtraction and division generators enforce these constraints for the target age group. Relaxing them would produce unanswerable questions for the wheel range shown.
+- **Generator retry limit is 50**. The retry cap in each question generator (`for _ in range(50)`) prevents an infinite loop when constraints are tight at high difficulty. Removing the limit risks hangs; lowering it too far causes premature fallback to easy values.
+- **`GameFramework` version matters**. `mathwheel/game_framework.py` is a modified copy of `fish/game_framework.py` with discrete-input changes. Do not replace it wholesale from the fish version without re-applying those modifications.
+
 ## License
 GPL-3.0-or-later

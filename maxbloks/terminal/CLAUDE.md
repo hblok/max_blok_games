@@ -324,5 +324,14 @@ COMMON_PACKAGES = {
 - Adjust `DEFAULT_SCREEN_WIDTH` and `DEFAULT_SCREEN_HEIGHT` in `config.py`
 - Try different font sizes
 
+## Invariants / What NOT to Change
+
+- **`core/compat_sdl.py` must remain a symlink** to `../../common/compat_sdl.py`. The symlink is one level deeper than other games (inside `core/`) — do not move it or replace it with a copy.
+- **Dangerous commands must always show `ConfirmDialog`**. The `'dangerous': True` flag in `config.py` is a safety contract with users executing destructive commands (`rm`, `reboot`, etc.) via gamepad. Bypassing or removing the confirmation step is a regression.
+- **`CommandExecutor` uses `subprocess`, not `os.system` or `shell=True`**. Shell injection is prevented by passing command lists to subprocess. Do not switch to `shell=True` or `os.system` — either enables command injection via crafted arguments.
+- **`BUTTON_MAP` in `config.py` is device-specific hardware**. The integer values map directly to physical gamepad button indices on Anbernic/R46H hardware. Renaming or reordering these will break all navigation on target devices.
+- **Dynamic argument generators must not block the main loop**. Generators like directory listing and process enumeration run synchronously in the UI thread. Any generator that can take more than ~100 ms must be moved to a background thread to prevent input lag.
+- **Virtual keyboard input validators must not be removed**. The `'port'`, `'url'`, and `'ssh_host'` validators prevent obviously malformed values from reaching `CommandExecutor`. They are not cosmetic — they catch errors before shell execution.
+
 ## License
 GPL-3.0-or-later

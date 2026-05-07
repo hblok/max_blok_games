@@ -219,6 +219,17 @@ Test coverage focuses on the headless, pygame-free modules (`utils`, `entities`,
 - **World map**: fleshed-out level selection screen (currently `map_view` routes back to menu).
 - **Multi-profile**: multiple save slots for siblings.
 
+## Invariants / What NOT to Change
+
+- **`compat_sdl.py` must remain a symlink** to `../common/compat_sdl.py`. Do not copy it.
+- **Gameplay screens must remain icon-only**. The target audience (age 6–7 early readers) relies entirely on the cartoon icon to identify the word. Adding prose labels to gameplay screens undermines the pedagogical contract.
+- **All icons must use `pygame.draw` primitives only** — no external image files. This keeps the package self-contained for offline/handheld deployment and avoids asset licensing issues.
+- **`ALPHABET` in `constants.py` is the single source of truth for valid letters**. The wheel rendering, word validation, and shuffle logic all derive from this list. Changing it without auditing all word entries in `utils.build_default_levels()` will produce unspellable words.
+- **Save file path (`~/.spellwheels_progress.json`) is public API**. Users accumulate progress between sessions. Changing the path or format without a migration path silently erases saved progress.
+- **`GameState` enum order must stay stable** for future save-file compatibility. Insert new states at the end only.
+- **`stars_for_mistakes()` is a pure function** — no side effects, no state. Tests rely on this; callers call it multiple times to preview star outcomes. Do not add caching or state to it.
+- **Words in `build_default_levels()` must only use letters present in `ALPHABET`**. Word validation at load time will raise if this is violated, but the constraint also needs to hold during development (no accented letters outside Ä/Ö/Ü).
+
 ## License
 
 GPL-3.0-or-later

@@ -248,5 +248,14 @@ elif self.player.size >= 40 and self.level == 2:
 - Reduce frame rate: Change `fps=60` to `fps=30`
 - Reduce fish count: Modify `INITIAL_FISH_COUNT`
 
+## Invariants / What NOT to Change
+
+- **`compat_sdl.py` must remain a symlink** to `../common/compat_sdl.py`. Do not copy it.
+- **Growth formula is `player.size += fish.size * 0.1`**. The level thresholds (20 and 40) were tuned against this rate. Changing the multiplier without adjusting thresholds will make levels unreachable or trivially fast.
+- **Level thresholds are 20 and 40**. These values are referenced in both the game logic and the documentation. Change them together or not at all.
+- **Sound files are optional** — the fallback generator functions (`generate_eat_sound`, `generate_game_over_sound`, `generate_level_up_sound`) must remain functional. Removing them breaks the game on systems without the `.wav` files.
+- **Collision rule for eating fish is `player.size >= fish.size` (not strictly greater-than)**. Equal-size collisions favor the player, which is the intended forgiving feel. Changing to `>` makes same-size fish unkillable.
+- **`GameFramework` manages the main game loop**. `FishGame` delegates timing and event pumping to the base class. Do not add a secondary loop inside `FishGame` methods.
+
 ## License
 GPL-3.0-or-later

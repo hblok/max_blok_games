@@ -165,5 +165,13 @@ python -m unittest discover -s tests
 3. Implement effect in `Player` class
 4. Add to `_POWERUP_DEFS` in `game.py`
 
+## Invariants / What NOT to Change
+
+- **`compat_sdl.py` must remain a symlink** to `../common/compat_sdl.py`. Do not replace it with a copy — divergence causes silent platform differences.
+- **Logical resolution is 640×480**. Coordinate math and hit-radii throughout `entities.py`, `enemies.py`, and `visual.py` are written against this canvas. Changing `LOGICAL_WIDTH`/`LOGICAL_HEIGHT` in `settings.py` without auditing every hardcoded offset will break layout.
+- **Screen wrapping applies only to player, enemies, and power-ups — bullets do not wrap**. This is intentional game design; reversing it changes the feel of every weapon power-up.
+- **`GameState` enum order must stay stable**. If save-state serialization is ever added, enum values are used as keys. Reordering or inserting members before existing ones will break compatibility.
+- **`init_display()` must be called before any `pygame.draw` or font rendering**. The display surface does not exist until after `compat_sdl.init_display()` returns. Any code moved earlier in startup that draws will crash on headless systems.
+
 ## License
 GPL-3.0-or-later
