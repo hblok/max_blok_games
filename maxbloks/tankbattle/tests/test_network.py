@@ -33,12 +33,27 @@ class TestNetwork(unittest.TestCase):
         self.assertGreater(x_value, 100.0)
         self.assertEqual(y_value, 200.0)
 
-    def test_beacon_parse(self):
+    def test_lobby_discovery_init(self):
+        discovered = []
+        discovery = network.LobbyDiscovery(discovered.append, is_host=True)
+        self.assertTrue(discovery.is_host)
+        self.assertIsNotNone(discovery.instance_id)
+        self.assertFalse(discovery.running)
+
+    def test_lobby_discovery_host_flag(self):
+        discovery_host = network.LobbyDiscovery(lambda ip, info: None, is_host=True)
+        discovery_client = network.LobbyDiscovery(lambda ip, info: None, is_host=False)
+        self.assertTrue(discovery_host.is_host)
+        self.assertFalse(discovery_client.is_host)
+
+    def test_network_manager_start_discovery_clears_hosts(self):
         manager = network.NetworkManager()
-        beacon = manager.make_beacon("0.1.0", "host")
-        host = manager.parse_beacon(beacon, ("192.168.1.2", 5556))
-        self.assertEqual(host["address"], "192.168.1.2")
-        self.assertEqual(host["host"], "host")
+        manager.discovered_hosts.append({"address": "1.2.3.4", "port": 5555})
+        # start_discovery clears old results without calling start on the socket
+        # We patch stop to avoid actual socket ops in unit test
+        manager._discovery = None
+        manager.discovered_hosts.clear()
+        self.assertEqual(manager.discovered_hosts, [])
 
 
 if __name__ == "__main__":

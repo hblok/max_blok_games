@@ -6,7 +6,10 @@
 import dataclasses
 import json
 import socket
+import struct
+import threading
 import time
+import uuid
 
 from maxbloks.tankbattle import constants
 
@@ -149,6 +152,168 @@ class DeadReckoner:
         return x_value, y_value
 
 
+class LobbyDiscovery:
+    """UDP multicast LAN host discovery for Tank Battle lobbies.
+
+    All instances (hosts and clients) broadcast on the Tank Battle multicast
+    group so discovery is symmetric.  The TANKBATTLE_BEACON / TANKBATTLE_RESPONSE
+    message types keep this traffic isolated from other games on the same LAN
+    that may use different multicast groups or message types.
+    """
+
+    def __init__(self, on_host_found, is_host=False):
+        self.on_host_found = on_host_found
+        self.is_host = is_host
+        self.running = False
+        self.local_ip = self._get_local_ip()
+        self.instance_id = uuid.uuid4().hex
+        self._send_socket = None
+        self._listen_socket = None
+        self._threads = []
+
+    def _get_local_ip(self):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "127.0.0.1"
+
+    def start(self):
+        """Start broadcast and listener threads."""
+        self.running = True
+        self._setup_send_socket()
+        if not self._setup_listen_socket():
+            return
+        t_broadcast = threading.Thread(target=self._broadcast_loop, daemon=True)
+        t_listen = threading.Thread(target=self._listen_loop, daemon=True)
+        t_broadcast.start()
+        t_listen.start()
+        self._threads = [t_broadcast, t_listen]
+
+    def _setup_send_socket(self):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
+        except Exception:
+            pass
+        try:
+            s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
+        except Exception:
+            pass
+        try:
+            s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(self.local_ip))
+        except Exception:
+            pass
+        self._send_socket = s
+
+    def _setup_listen_socket(self):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind(("", constants.DISCOVERY_PORT))
+        except Exception as e:
+            print(f"TankBattle discovery bind failed: {e}")
+            return False
+        try:
+            mreq = struct.pack(
+                "4s4s",
+                socket.inet_aton(constants.DISCOVERY_MULTICAST_GROUP),
+                socket.inet_aton("0.0.0.0"),
+            )
+            s.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+        except Exception as e:
+            print(f"TankBattle multicast join failed: {e}")
+            return False
+        s.settimeout(1.0)
+        self._listen_socket = s
+        return True
+
+    def _make_message(self, msg_type):
+        return json.dumps(
+            {
+                "type": msg_type,
+                "instance_id": self.instance_id,
+                "ip": self.local_ip,
+                "hosting": self.is_host,
+                "port": constants.HOST_PORT if self.is_host else 0,
+            },
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+    def _broadcast_loop(self):
+        while self.running:
+            try:
+                data = self._make_message(constants.BEACON_PREFIX)
+                self._send_socket.sendto(data, (constants.DISCOVERY_MULTICAST_GROUP, constants.DISCOVERY_PORT))
+            except Exception as e:
+                if self.running:
+                    print(f"TankBattle discovery broadcast error: {e}")
+            time.sleep(constants.DISCOVERY_BROADCAST_INTERVAL)
+
+    def _listen_loop(self):
+        while self.running:
+            try:
+                data, addr = self._listen_socket.recvfrom(1024)
+            except socket.timeout:
+                continue
+            except Exception as e:
+                if self.running:
+                    print(f"TankBattle discovery listen error: {e}")
+                continue
+            try:
+                msg = json.loads(data.decode("utf-8"))
+            except json.JSONDecodeError:
+                continue
+            if msg.get("instance_id") == self.instance_id:
+                continue
+            msg_type = msg.get("type")
+            if msg_type == constants.BEACON_PREFIX:
+                self._send_response(addr[0])
+                if msg.get("hosting"):
+                    self.on_host_found(addr[0], msg)
+            elif msg_type == constants.BEACON_RESPONSE:
+                if msg.get("hosting"):
+                    self.on_host_found(addr[0], msg)
+
+    def _send_response(self, target_ip):
+        try:
+            data = self._make_message(constants.BEACON_RESPONSE)
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.sendto(data, (target_ip, constants.DISCOVERY_PORT))
+        except Exception as e:
+            print(f"TankBattle discovery response error: {e}")
+
+    def stop(self):
+        """Stop threads and close sockets."""
+        self.running = False
+        if self._listen_socket is not None:
+            try:
+                mreq = struct.pack(
+                    "4s4s",
+                    socket.inet_aton(constants.DISCOVERY_MULTICAST_GROUP),
+                    socket.inet_aton("0.0.0.0"),
+                )
+                self._listen_socket.setsockopt(socket.IPPROTO_IP, socket.IP_DROP_MEMBERSHIP, mreq)
+            except Exception:
+                pass
+        for s in (self._send_socket, self._listen_socket):
+            if s is not None:
+                try:
+                    s.close()
+                except Exception:
+                    pass
+        for t in self._threads:
+            if t.is_alive():
+                t.join(timeout=2.0)
+        self._send_socket = None
+        self._listen_socket = None
+        self._threads = []
+
+
 class NetworkManager:
     """Small host/client networking facade for lobby and state sync."""
 
@@ -160,6 +325,7 @@ class NetworkManager:
         self.connected = False
         self.discovered_hosts = []
         self.last_update_sent = 0.0
+        self._discovery = None
 
     def start_host(self, host="", port=constants.HOST_PORT):
         """Start TCP host socket."""
@@ -189,29 +355,25 @@ class NetworkManager:
             self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.udp_socket.setblocking(False)
 
-    def make_beacon(self, game_version, host_name):
-        """Create UDP discovery beacon payload."""
-        payload = {
-            "prefix": constants.BEACON_PREFIX,
-            "version": game_version,
-            "host": host_name,
-            "port": constants.HOST_PORT,
-        }
-        return json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    def start_discovery(self, is_host=False):
+        """Start multicast peer discovery; clears any previous results."""
+        self.discovered_hosts.clear()
+        self._discovery = LobbyDiscovery(self._on_host_discovered, is_host)
+        self._discovery.start()
 
-    def parse_beacon(self, data, address):
-        """Parse a UDP discovery beacon and store host."""
-        payload = json.loads(data.decode("utf-8"))
-        if payload.get("prefix") != constants.BEACON_PREFIX:
-            raise ValueError("not a TankBattle beacon")
-        host = {
-            "address": address[0],
-            "version": payload["version"],
-            "host": payload["host"],
-            "port": payload["port"],
-        }
-        self.discovered_hosts.append(host)
-        return host
+    def stop_discovery(self):
+        """Stop multicast peer discovery."""
+        if self._discovery is not None:
+            self._discovery.stop()
+            self._discovery = None
+
+    def _on_host_discovered(self, ip, info):
+        """Record a newly found host (called from the discovery thread)."""
+        if not any(h["address"] == ip for h in self.discovered_hosts):
+            self.discovered_hosts.append({
+                "address": ip,
+                "port": info.get("port", constants.HOST_PORT),
+            })
 
     def make_handshake(self, game_version, player_id):
         """Create handshake message."""
@@ -240,7 +402,8 @@ class NetworkManager:
         return False
 
     def close(self):
-        """Close open sockets."""
+        """Close open sockets and stop discovery."""
+        self.stop_discovery()
         for sock in (self.tcp_socket, self.udp_socket):
             if sock is not None:
                 sock.close()
