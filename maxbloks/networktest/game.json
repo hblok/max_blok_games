@@ -1,6 +1,13 @@
-{
+[
+  {
+    "id": "networktest",
     "name": "Network Test",
     "description": "LAN device discovery and pairing utility for handheld consoles",
     "author": "H. Blok",
-    "version": "0.0.1"
-}
+    "version": "{VERSION}",
+    "entryPoint": "maxbloks/networktest/main.py",
+    "startScript": "Networktest.sh",
+    "icon": "Networktest.png",
+    "downloadUrl": "https://github.com/hblok/max_blok_games/releases/download/v{VERSION}-networktest/networktest-{VERSION}-py3-none-any.whl"    
+  }
+]

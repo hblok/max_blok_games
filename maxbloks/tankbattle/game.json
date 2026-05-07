@@ -1,9 +1,13 @@
-{
-  "id": "tankbattle",
-  "name": "Tank Battle",
-  "description": "Two-player top-down tank battle over local WiFi",
-  "version": "{VERSION}",
-  "startScript": "Tankbattle.sh",
-  "icon": "Tankbattle.png",
-  "downloadUrl": "https://github.com/hblok/max_blok_games/releases/download/v{VERSION}-tankbattle/tankbattle-{VERSION}-py3-none-any.whl"
-}
+[
+  {
+    "id": "tankbattle",
+    "name": "Tank Battle",
+    "description": "Two-player top-down tank battle over local WiFi",
+    "author": "H. Blok",    
+    "version": "{VERSION}",
+    "entryPoint": "maxbloks/tankbattle/main.py",  
+    "startScript": "Tankbattle.sh",
+    "icon": "Tankbattle.png",
+    "downloadUrl": "https://github.com/hblok/max_blok_games/releases/download/v{VERSION}-tankbattle/tankbattle-{VERSION}-py3-none-any.whl"
+  }
+]
