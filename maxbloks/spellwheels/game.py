@@ -75,9 +75,9 @@ class SpellWheelsGame:
         )
         print("screen: ", str(screen))
         print("display_info: ", str(display_info))
-        
-        pygame.event.pump() # Force internal SDL state sync
-        pygame.time.delay(100) # Give the OS a moment to catch up
+
+        #pygame.event.pump() # Force internal SDL state sync
+        #pygame.time.delay(100) # Give the OS a moment to catch up
 
         # 2. Now that the display driver is chosen and the window exists,
         #    it is safe to call the blanket pygame.init().
@@ -86,6 +86,7 @@ class SpellWheelsGame:
         pygame.joystick.init()
         pygame.font.init()
 
+        pygame.event.get()
 
         self.screen = screen
         self.screen_width = display_info["width"]
@@ -138,7 +139,7 @@ class SpellWheelsGame:
     def _init_state(self):
         #return
         self.levels = utils.build_default_levels()
-        return
+        #return
 
         self.score = utils.ScoreTracker()
         self.saver = utils.ProgressSaver()
@@ -159,6 +160,7 @@ class SpellWheelsGame:
             self.levels[self.level_index], word_start
         )
 
+        #print("self._advance_timer = 0")
         self._advance_timer = 0
         self._menu_cursor = constants.MENU_ITEM_PLAY
         self._has_saved_game = (
@@ -181,17 +183,17 @@ class SpellWheelsGame:
         """Main game loop."""
         running = True
         while running:
-            print("game.run() - 1.")
+            #print("game.run() - 1.")
             inp = input_handler.update()
-            print("game.run() - 2.")            
+            #print("game.run() - 2.")            
             running = self.update(inp)
-            print("game.run() - 3.")            
+            #print("game.run() - 3.")            
 
             self.screen.fill((0, 0, 0))
             self.draw(self.screen)
             pygame.display.flip()
             self.clock.tick(constants.TARGET_FPS)
-            print("game.run() - 10.")
+            #print("game.run() - 10.")
 
         pygame.quit()
         sys.exit(0)
@@ -253,6 +255,7 @@ class SpellWheelsGame:
             ) % constants.MENU_ITEM_COUNT
 
         if inp.submit:
+            print("inp.submit")
             self._activate_menu_item()
 
         if inp.pause:
@@ -280,6 +283,7 @@ class SpellWheelsGame:
             pygame.event.post(pygame.event.Event(pygame.QUIT))
 
     def _update_playing(self, inp, dt):
+        #print("_update_playing")
         if inp.pause:
             self.state = GameState.PAUSED
             return
@@ -288,8 +292,11 @@ class SpellWheelsGame:
             self.state = GameState.MENU
             return
 
+        #print("_advance_timer: ", self._advance_timer)        
         if self.feedback.active:
+            #print("feedback.active")
             self._advance_timer -= dt
+            print("_advance_timer: ", self._advance_timer)
             if self._advance_timer <= 0:
                 self._after_correct_advance()
             return
@@ -314,6 +321,7 @@ class SpellWheelsGame:
             puzzle.trigger_hint()
 
         if inp.submit:
+            print("inp.submit - word")
             self._submit_word()
 
     def _update_paused(self, inp):
@@ -336,6 +344,7 @@ class SpellWheelsGame:
     def _submit_word(self):
         puzzle = self.runner.puzzle
         if puzzle.is_correct():
+            print("correct")
             stars = self.score.award_for_correct()
             self._last_stars_awarded = stars
             self.star_anim.trigger()
@@ -346,6 +355,8 @@ class SpellWheelsGame:
             puzzle.trigger_wrong_shake()
 
     def _after_correct_advance(self):
+        print("_after_correct_advance - 0.")
+            
         self.feedback.dismiss()
         if self.runner.is_last_word:
             self._finish_level()
@@ -365,6 +376,7 @@ class SpellWheelsGame:
         self._save_progress(level_completed=True)
 
     def _begin_next_level_or_finish(self):
+        pring("_begin_next_level_or_finish")
         self.feedback.dismiss()
         if self.level_index >= len(self.levels) - 1:
             self.state = GameState.GAME_OVER

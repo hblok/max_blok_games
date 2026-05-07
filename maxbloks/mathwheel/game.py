@@ -43,7 +43,7 @@ class MathWheelGame(GameFramework):
         
         print("screen: ", str(screen))
         print("display_info: ", str(display_info))
-        pygame.event.get()
+
         super().__init__(screen, display_info, title, fps)
         self._init_fonts()
         self._init_surfaces()

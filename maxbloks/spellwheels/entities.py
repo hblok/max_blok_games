@@ -231,6 +231,7 @@ class FeedbackEffect:
         self.timer = constants.LEVEL_COMPLETE_DISPLAY
 
     def dismiss(self):
+        print("dismiss")
         self.active = False
         self.kind = None
         self.timer = 0
@@ -239,8 +240,8 @@ class FeedbackEffect:
         if not self.active:
             return
         self.timer -= dt_ms
-        if self.timer <= 0:
-            self.dismiss()
+        #if self.timer <= 0:
+        #    self.dismiss()
 
     @property
     def alpha(self):

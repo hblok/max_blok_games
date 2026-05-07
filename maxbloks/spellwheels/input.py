@@ -75,8 +75,6 @@ class InputHandler:
         faulthandler.enable()
 
         if pygame.event and pygame.event.get:
-            time.sleep(1)
-
             events = pygame.event.get()
             for event in events:
                 self._handle_event(event, state)
@@ -115,6 +113,7 @@ class InputHandler:
             state.spin_down = True
         elif key in (pygame.K_SPACE, pygame.K_RETURN):
             state.submit = True
+            print("submit")
         elif key == pygame.K_BACKSPACE:
             state.clear = True
         elif key == pygame.K_h:
