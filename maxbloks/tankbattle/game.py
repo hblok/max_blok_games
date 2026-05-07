@@ -146,16 +146,20 @@ class TankBattleGame:
         if input_state.confirm:
             if self.menu_index == 0:
                 self.net.start_host()
+                self.net.start_discovery(is_host=True)
                 self.state = GameState.LOBBY
             elif self.menu_index == 1:
+                self.net.start_discovery(is_host=False)
                 self.state = GameState.LOBBY
             else:
                 self.running = False
 
     def handle_input_lobby(self, input_state):
         if input_state.pause:
+            self.net.stop_discovery()
             self.state = GameState.MENU
         if input_state.confirm:
+            self.net.stop_discovery()
             self.start_match()
 
     def handle_input_connecting(self, input_state):

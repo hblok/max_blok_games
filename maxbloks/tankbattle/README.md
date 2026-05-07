@@ -20,9 +20,11 @@ On a gamepad, use the left analog stick to drive and rotate the tank, the right 
 
 ## Hosting and Joining over WiFi
 
-From the menu, choose **Host Game** on one device. The host opens TCP port 5555 for the reliable lobby connection and advertises itself with UDP beacons on port 5556. On the second device, choose **Join Game** to discover hosts on the local subnet. Manual IP entry is planned as a fallback for networks that block UDP broadcast.
+From the menu, choose **Host Game** on one device and **Join Game** on the other. Both devices immediately begin broadcasting `TANKBATTLE_BEACON` messages every 2 seconds to the Tank Battle multicast group (`239.255.190.20`, UDP port 5556) and listening for beacons from peers. When a beacon arrives from another instance, each device sends a direct unicast reply, so discovery is mutual and works within the first few seconds regardless of which device started first.
 
-The host generates the match map seed and sends it to the client so both devices use the same arena. During play, frequent tank state updates are sent over UDP at approximately 20 Hz, while reliable events such as round transitions and power-up spawns use TCP.
+The game-specific multicast group and `TANKBATTLE_BEACON` / `TANKBATTLE_RESPONSE` message types prevent Tank Battle lobbies from appearing in the discovery lists of other maxbloks games running on the same network (such as networktest).
+
+Once a host is found the client connects over TCP port 5555. The host generates the match map seed and sends it to the client so both devices use the same arena. During play, tank state updates are sent over UDP at approximately 20 Hz, while reliable events such as round transitions and power-up spawns use the TCP connection. Remote tank positions are smoothed between UDP packets using dead reckoning.
 
 ## Features
 
