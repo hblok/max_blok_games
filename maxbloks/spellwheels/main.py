@@ -44,10 +44,10 @@ def main():
     pygame.font.init()
     
     game = SpellWheelsGame()
-    #input_handler = InputHandler()
-    pygame.event.pump() 
-    pygame.event.get()
-    #game.run(input_handler)
+    input_handler = InputHandler()
+    #pygame.event.pump() 
+    #pygame.event.get()
+    game.run(input_handler)
 
 
 if __name__ == "__main__":

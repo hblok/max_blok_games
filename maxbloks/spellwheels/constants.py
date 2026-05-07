@@ -127,8 +127,8 @@ BTN_EXIT_2 = 13
 # ------------------------------------------------------------------
 # Feedback timing (ms)
 # ------------------------------------------------------------------
-CORRECT_FEEDBACK_DURATION = 1400
-CORRECT_AUTO_ADVANCE_DELAY = 1400
+CORRECT_FEEDBACK_DURATION = 800
+CORRECT_AUTO_ADVANCE_DELAY = 800
 WRONG_SHAKE_DURATION = 600
 WRONG_SHAKE_AMPLITUDE = 8     # pixels
 STAR_ANIM_DURATION = 700
