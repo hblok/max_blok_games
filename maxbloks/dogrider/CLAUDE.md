@@ -217,5 +217,14 @@ Edit `constants.py` to adjust:
 - Game runs in fullscreen by default
 - Modify `fullscreen=True` to `fullscreen=False` in `dog_rider_game.py`
 
+## Invariants / What NOT to Change
+
+- **`compat_sdl.py` must remain a symlink** to `../common/compat_sdl.py`. Do not copy it.
+- **Win condition is exactly 75 obstacles** (`MAX_OBSTACLES = 75`). The difficulty curve and scoring system assume this total. Changing it shifts balance across the whole game.
+- **`GROUND_Y = 350` is load-bearing**. The parallax background layers in `background.py` are drawn relative to this value. Changing `GROUND_Y` without updating `BackgroundManager` will misalign the visual ground line with the physics ground.
+- **`GRAVITY` and `JUMP_POWER` are a paired constant**. `JUMP_POWER = -15` was tuned to clear obstacles with `GRAVITY = 0.8`. Changing one without rebalancing the other breaks obstacle clearance.
+- **Speed must increase, not stay fixed**. `SPEED_INCREASE_RATE > 0` is required by the progressive difficulty design. Setting it to zero produces a flat-difficulty game that bypasses level design intent.
+- **`GameFramework` manages the main game loop**. `DogRiderGame` delegates timing and event pumping to the base class. Do not add a secondary loop inside game methods.
+
 ## License
 GPL-3.0-or-later
