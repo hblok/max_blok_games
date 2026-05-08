@@ -154,7 +154,11 @@ class TankBattleGame:
                 self.net.start_host()
                 self.net.start_discovery(is_host=True)
                 self.state = GameState.LOBBY
+<<<<<<< tankbattle-single-player
             elif self.menu_index == 2:
+=======
+            elif self.menu_index == 1:
+>>>>>>> main
                 self.net.start_discovery(is_host=False)
                 self.state = GameState.LOBBY
             else:
