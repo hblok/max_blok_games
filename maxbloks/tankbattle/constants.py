@@ -147,7 +147,14 @@ COLOR_WATER = (35, 75, 105)
 COLOR_TRANSPARENT = (0, 0, 0, 0)
 
 # Menu
-MENU_ITEMS = ("Host Game", "Join Game", "Quit")
+MENU_ITEMS = ("Solo Practice", "Host Game", "Join Game", "Quit")
+
+# AI (single-player)
+AI_ENGAGE_DISTANCE = 300.0
+AI_RETREAT_DISTANCE = 120.0
+AI_AIM_TOLERANCE_DEG = 25.0
+AI_FIRE_INTERVAL_MIN = 0.3
+AI_FIRE_INTERVAL_MAX = 0.9
 LOBBY_ITEMS = ("Start", "Manual IP", "Back")
 MENU_FONT_SIZE = 34
 HUD_FONT_SIZE = 20

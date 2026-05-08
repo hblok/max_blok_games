@@ -9,6 +9,7 @@ import time
 
 import pygame
 
+from maxbloks.tankbattle import ai
 from maxbloks.tankbattle import arena
 from maxbloks.tankbattle import compat_sdl
 from maxbloks.tankbattle import constants
@@ -60,6 +61,8 @@ class TankBattleGame:
             entities.Tank(constants.SPAWN_TWO_X, constants.SPAWN_TWO_Y, 315.0, 315.0, player_id=2),
         ]
         self.local_player_index = 0
+        self.single_player = False
+        self.tank_ai = ai.TankAI()
         self.bullets = []
         self.mines = []
         self.powerups = []
@@ -145,10 +148,13 @@ class TankBattleGame:
             self.menu_index = (self.menu_index + input_state.menu_y) % len(constants.MENU_ITEMS)
         if input_state.confirm:
             if self.menu_index == 0:
+                self.single_player = True
+                self.start_match()
+            elif self.menu_index == 1:
                 self.net.start_host()
                 self.net.start_discovery(is_host=True)
                 self.state = GameState.LOBBY
-            elif self.menu_index == 1:
+            elif self.menu_index == 2:
                 self.net.start_discovery(is_host=False)
                 self.state = GameState.LOBBY
             else:
@@ -187,6 +193,7 @@ class TankBattleGame:
     def handle_input_match_over(self, input_state):
         if input_state.confirm:
             self.round_wins = [0, 0]
+            self.single_player = False
             self.state = GameState.MENU
 
     def _apply_tank_input(self, input_state, dt):
@@ -217,6 +224,8 @@ class TankBattleGame:
         if self.pending_input is not None:
             self._apply_tank_input(self.pending_input, dt)
             self.pending_input = None
+        if self.single_player:
+            self.tank_ai.update(self.tanks[1], self.tanks[0], self, dt)
         self.round_time_remaining -= dt
         for tank in self.tanks:
             tank.update(dt)
@@ -337,6 +346,8 @@ class TankBattleGame:
         self.sudden_death = False
 
     def _send_network_update(self):
+        if self.single_player:
+            return
         now = time.monotonic()
         if not self.net.should_send_update(now):
             return
