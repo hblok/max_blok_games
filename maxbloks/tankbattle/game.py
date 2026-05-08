@@ -91,6 +91,7 @@ class TankBattleGame:
             self.handle_input()
             self.update(dt)
             self.draw()
+        self.input_reader.cleanup()
         self.net.close()
         pygame.quit()
 
@@ -113,6 +114,7 @@ class TankBattleGame:
 
     def update(self, dt):
         """Dispatch state-specific updates."""
+        self.renderer.update(dt)
         updaters = {
             GameState.MENU: self.update_menu,
             GameState.LOBBY: self.update_lobby,
@@ -247,15 +249,22 @@ class TankBattleGame:
 
     def _update_projectiles(self, dt):
         for bullet in self.bullets:
+            was_alive = bullet.is_alive
             bullet.update(dt, self.arena)
             for tank in self.tanks:
                 if tank is not bullet.owner and tank.is_alive:
                     if utils.circles_collide(bullet.position, bullet.radius, tank.position, constants.TANK_HITBOX_RADIUS):
                         tank.damage(constants.SUDDEN_DEATH_DAMAGE if self.sudden_death else bullet.damage)
                         bullet.is_alive = False
+                        self.renderer.register_hit(bullet)
+            if was_alive and not bullet.is_alive and bullet.owner is not None:
+                pass
         for mine in self.mines:
             mine.update(dt)
-            mine.check_trigger(self.tanks)
+            was_alive = mine.is_alive
+            hit_tanks = mine.check_trigger(self.tanks)
+            if was_alive and not mine.is_alive:
+                self.renderer.register_mine_explosion(mine)
         self.bullets = [bullet for bullet in self.bullets if bullet.is_alive]
         self.mines = [mine for mine in self.mines if mine.is_alive]
 
@@ -290,6 +299,7 @@ class TankBattleGame:
         else:
             self._add_bullet(tank, tank.turret_angle)
         tank.consume_shot()
+        self.renderer.register_muzzle_flash(tank)
 
     def _add_bullet(self, tank, angle, speed=constants.BULLET_SPEED, damage=constants.BULLET_DAMAGE, weapon=entities.WeaponType.PRIMARY, bounces=0):
         dx_value, dy_value = utils.angle_to_vector(angle)
@@ -310,6 +320,9 @@ class TankBattleGame:
                     tank.clear_weapon()
             else:
                 self._finish_round(0 if self.tanks[0].hp > self.tanks[1].hp else 1)
+        for tank in self.tanks:
+            if not tank.is_alive:
+                self.renderer.register_destroy(tank)
         if not self.tanks[0].is_alive:
             self._finish_round(1)
         elif not self.tanks[1].is_alive:
