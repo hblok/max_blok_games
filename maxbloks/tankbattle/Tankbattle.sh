@@ -1,2 +1,2 @@
 #!/bin/sh
-python -m maxbloks.tankbattle.main
+python3 -m maxbloks.tankbattle.main
