@@ -32,6 +32,7 @@ class InputState:
         self.fire_secondary_pressed = False
         self.pause_pressed = False
         self.confirm_pressed = False
+        self.exit_pressed = False
 
         # Edge-detected (rising-edge) button states — True only on
         # the frame the button transitions from released to pressed.
@@ -39,9 +40,23 @@ class InputState:
         self.fire_secondary_just_pressed = False
         self.pause_just_pressed = False
         self.confirm_just_pressed = False
+        self.exit_just_pressed = False
 
-        # Navigation (one-shot per event)
+        # Navigation — continuous held states for menu up/down.
+        # These are used by the rising-edge detector to produce
+        # menu_up_just_pressed / menu_down_just_pressed.
+        self.menu_up_pressed = False
+        self.menu_down_pressed = False
+
+        # Navigation — edge-detected (one position per press).
+        self.menu_up_just_pressed = False
+        self.menu_down_just_pressed = False
+
+        # Legacy field kept for backward compatibility with hat events
+        # that already fire once per press.  Prefer menu_up/down_just_pressed
+        # in new code.
         self.menu_y = 0
+
         self.quit = False
 
 
@@ -53,6 +68,11 @@ class InputReader:
     (``just_pressed``) that is True only on the first frame a button
     is held.  This prevents rapid re-triggering from controller
     bounce or repeated KEYDOWN events.
+
+    Navigation debounce follows the same pattern: menu_up_pressed
+    and menu_down_pressed are continuous held states, and the
+    corresponding _just_pressed flags fire only on the rising edge,
+    ensuring one menu step per physical press.
     """
 
     def __init__(self, pygame_module):
@@ -64,6 +84,9 @@ class InputReader:
         self._prev_fire_secondary = False
         self._prev_pause = False
         self._prev_confirm = False
+        self._prev_exit = False
+        self._prev_menu_up = False
+        self._prev_menu_down = False
         # Turret input smoothing (low-pass filter)
         self._smooth_turret_x = 0.0
         self._smooth_turret_y = 0.0
@@ -124,11 +147,23 @@ class InputReader:
         state.confirm_just_pressed = (
             state.confirm_pressed and not self._prev_confirm
         )
+        state.exit_just_pressed = (
+            state.exit_pressed and not self._prev_exit
+        )
+        state.menu_up_just_pressed = (
+            state.menu_up_pressed and not self._prev_menu_up
+        )
+        state.menu_down_just_pressed = (
+            state.menu_down_pressed and not self._prev_menu_down
+        )
         # Store current held states for next frame's edge detection
         self._prev_fire_primary = state.fire_primary_pressed
         self._prev_fire_secondary = state.fire_secondary_pressed
         self._prev_pause = state.pause_pressed
         self._prev_confirm = state.confirm_pressed
+        self._prev_exit = state.exit_pressed
+        self._prev_menu_up = state.menu_up_pressed
+        self._prev_menu_down = state.menu_down_pressed
         return state
 
     def _smooth_turret_input(self, raw_vector):
@@ -173,9 +208,9 @@ class InputReader:
         if event.key in (self.pygame.K_LCTRL, self.pygame.K_RCTRL):
             state.fire_secondary_pressed = True
         if event.key in (self.pygame.K_UP, self.pygame.K_w):
-            state.menu_y = -1
+            state.menu_up_pressed = True
         if event.key in (self.pygame.K_DOWN, self.pygame.K_s):
-            state.menu_y = 1
+            state.menu_down_pressed = True
 
     def _read_keyboard_axes(self, state):
         keys = self.pygame.key.get_pressed()
@@ -233,6 +268,10 @@ class InputReader:
         can bounce on some controllers), we poll the current held state
         each frame and rely on the rising-edge detection in ``read()``
         to debounce.
+
+        Buttons 8 and 13 are mapped to exit (Back/Select and
+        Menu/Home on common controllers), which will quit the game
+        via exit_just_pressed in the game's main input handler.
         """
         if not self._joystick_initialized or self._joystick is None:
             return
@@ -254,13 +293,17 @@ class InputReader:
                 state.pause_pressed = True
                 state.fire_secondary_pressed = True
             if num_buttons > 8 and self._joystick.get_button(8):
-                state.pause_pressed = True
+                state.exit_pressed = True
             if num_buttons > 9 and self._joystick.get_button(9):
                 state.pause_pressed = True
             if num_buttons > 10 and self._joystick.get_button(10):
                 state.pause_pressed = True
+            if num_buttons > 11 and self._joystick.get_button(11):
+                state.menu_up_pressed = True
+            if num_buttons > 12 and self._joystick.get_button(12):
+                state.menu_down_pressed = True
             if num_buttons > 13 and self._joystick.get_button(13):
-                state.pause_pressed = True
+                state.exit_pressed = True
         except Exception:
             pass
 
@@ -275,9 +318,9 @@ class InputReader:
                     state.turn += float(hat_x)
                     state.drive -= float(hat_y)
                     if hat_y < 0:
-                        state.menu_y = -1
+                        state.menu_up_pressed = True
                     elif hat_y > 0:
-                        state.menu_y = 1
+                        state.menu_down_pressed = True
         except Exception:
             pass
 

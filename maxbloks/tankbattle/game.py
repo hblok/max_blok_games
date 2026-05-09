@@ -5,6 +5,8 @@
 
 import enum
 import random
+import socket
+import subprocess
 import time
 
 import pygame
@@ -32,6 +34,25 @@ class GameState(enum.Enum):
     PAUSED = "paused"
     ROUND_OVER = "round_over"
     MATCH_OVER = "match_over"
+
+
+def _get_wifi_ssid():
+    """Best-effort retrieval of the current WiFi SSID.
+
+    Works on typical Linux handhelds (nmcli) and falls back
+    gracefully on other platforms or when not connected via WiFi.
+    """
+    try:
+        result = subprocess.run(
+            ["nmcli", "-t", "-f", "active,ssid", "dev", "wifi"],
+            capture_output=True, text=True, timeout=2,
+        )
+        for line in result.stdout.strip().splitlines():
+            if line.startswith("yes:"):
+                return line.split(":", 1)[1]
+    except Exception:
+        pass
+    return None
 
 
 class TankBattleGame:
@@ -74,6 +95,15 @@ class TankBattleGame:
         self.renderer = rendering.Renderer(pygame, self.screen)
         self.input_reader = input.InputReader(pygame)
 
+        # Lobby state
+        self.lobby_index = 0
+        self.lobby_is_host = False
+        self.lobby_discovered_clients = []  # list of {"address": ip, "port": port}
+        self.lobby_connected_clients = []   # list of IP strings
+        self.lobby_client_last_seen = {}    # ip -> timestamp
+        self.lobby_local_ip = "0.0.0.0"
+        self.lobby_wifi_ssid = None
+
     @property
     def local_tank(self):
         """Return local player's tank."""
@@ -99,6 +129,9 @@ class TankBattleGame:
         """Dispatch state-specific input."""
         input_state = self._read_input()
         if input_state.quit:
+            self.running = False
+        # Exit via controller button 8 or 13 (rising-edge only)
+        if input_state.exit_just_pressed:
             self.running = False
         handlers = {
             GameState.MENU: self.handle_input_menu,
@@ -145,30 +178,133 @@ class TankBattleGame:
     def _read_input(self):
         return self.input_reader.read()
 
+    # ------------------------------------------------------------------
+    # Menu
+    # ------------------------------------------------------------------
+
     def handle_input_menu(self, input_state):
-        if input_state.menu_y:
+        # Use edge-detected navigation so each button press moves
+        # the cursor exactly one position, regardless of how long
+        # the button is held.
+        if input_state.menu_up_just_pressed:
+            self.menu_index = (self.menu_index - 1) % len(constants.MENU_ITEMS)
+        if input_state.menu_down_just_pressed:
+            self.menu_index = (self.menu_index + 1) % len(constants.MENU_ITEMS)
+        # Also support the legacy menu_y event (hat-based, one-shot)
+        if input_state.menu_y != 0:
             self.menu_index = (self.menu_index + input_state.menu_y) % len(constants.MENU_ITEMS)
         if input_state.confirm_just_pressed:
             if self.menu_index == 0:
                 self.single_player = True
                 self.start_match()
             elif self.menu_index == 1:
-                self.net.start_host()
-                self.net.start_discovery(is_host=True)
-                self.state = GameState.LOBBY
+                self._enter_lobby(is_host=True)
             elif self.menu_index == 2:
-                self.net.start_discovery(is_host=False)
-                self.state = GameState.LOBBY
+                self._enter_lobby(is_host=False)
             else:
                 self.running = False
 
+    def _enter_lobby(self, is_host):
+        """Transition from MENU to LOBBY, starting discovery."""
+        self.lobby_is_host = is_host
+        self.lobby_index = 0
+        self.lobby_discovered_clients.clear()
+        self.lobby_connected_clients.clear()
+        self.lobby_client_last_seen.clear()
+        self.lobby_local_ip = self.net.local_ip
+        self.lobby_wifi_ssid = _get_wifi_ssid()
+        if is_host:
+            self.net.start_host()
+        self.net.start_discovery(is_host=is_host)
+        self.state = GameState.LOBBY
+
+    # ------------------------------------------------------------------
+    # Lobby
+    # ------------------------------------------------------------------
+
     def handle_input_lobby(self, input_state):
+        # Navigation within lobby items (Start / Manual IP / Back)
+        if input_state.menu_up_just_pressed:
+            self.lobby_index = (self.lobby_index - 1) % len(constants.LOBBY_ITEMS)
+        if input_state.menu_down_just_pressed:
+            self.lobby_index = (self.lobby_index + 1) % len(constants.LOBBY_ITEMS)
+        if input_state.menu_y != 0:
+            self.lobby_index = (self.lobby_index + input_state.menu_y) % len(constants.LOBBY_ITEMS)
+
         if input_state.pause_just_pressed:
             self.net.stop_discovery()
             self.state = GameState.MENU
         if input_state.confirm_just_pressed:
-            self.net.stop_discovery()
-            self.start_match()
+            if self.lobby_index == 0:  # Start
+                self.net.stop_discovery()
+                self.start_match()
+            elif self.lobby_index == 1:  # Manual IP — future work
+                pass
+            else:  # Back
+                self.net.stop_discovery()
+                self.state = GameState.MENU
+
+    def update_lobby(self, dt):
+        """Refresh lobby discovery data and accept host connections."""
+        now = time.monotonic()
+
+        # Prune stale discovered peers (timeout > 10 s)
+        stale = [
+            ip for ip, ts in self.lobby_client_last_seen.items()
+            if now - ts > constants.DISCOVERY_TIMEOUT
+        ]
+        for ip in stale:
+            del self.lobby_client_last_seen[ip]
+
+        # Refresh discovered client list from NetworkManager
+        self.lobby_discovered_clients = list(self.net.discovered_hosts)
+
+        # If host, try to accept a TCP connection
+        if self.lobby_is_host and self.net.tcp_socket is not None:
+            try:
+                conn, addr = self.net.tcp_socket.accept()
+                # Non-blocking read for handshake
+                conn.setblocking(False)
+                try:
+                    data = conn.recv(4096)
+                    if data:
+                        payload = self.net.parse_handshake(data)
+                        self.net.tcp_socket_client = conn
+                        self.net.remote_address = addr
+                        self.net.connected = True
+                        peer_ip = addr[0]
+                        if peer_ip not in self.lobby_connected_clients:
+                            self.lobby_connected_clients.append(peer_ip)
+                except BlockingIOError:
+                    # No data yet, keep connection for next frame
+                    conn.setblocking(True)
+                    conn.settimeout(0.001)
+                    try:
+                        data = conn.recv(4096)
+                        if data:
+                            payload = self.net.parse_handshake(data)
+                            self.net.tcp_socket_client = conn
+                            self.net.remote_address = addr
+                            self.net.connected = True
+                            peer_ip = addr[0]
+                            if peer_ip not in self.lobby_connected_clients:
+                                self.lobby_connected_clients.append(peer_ip)
+                    except Exception:
+                        pass
+            except BlockingIOError:
+                pass
+            except Exception:
+                pass
+
+        # Track discovery timestamps for discovered clients
+        for host_info in self.lobby_discovered_clients:
+            ip = host_info.get("address", "")
+            if ip and ip not in self.lobby_client_last_seen:
+                self.lobby_client_last_seen[ip] = now
+
+    # ------------------------------------------------------------------
+    # Other states
+    # ------------------------------------------------------------------
 
     def handle_input_connecting(self, input_state):
         if input_state.pause_just_pressed:
@@ -231,9 +367,6 @@ class TankBattleGame:
             self._drop_mine(tank)
 
     def update_menu(self, dt):
-        pass
-
-    def update_lobby(self, dt):
         pass
 
     def update_connecting(self, dt):
@@ -398,11 +531,15 @@ class TankBattleGame:
         )
         network.PacketCodec.serialize_player_update(packet)
 
+    # ------------------------------------------------------------------
+    # Drawing
+    # ------------------------------------------------------------------
+
     def draw_menu(self):
         self.renderer.draw_menu(self.menu_index)
 
     def draw_lobby(self):
-        self.renderer.draw_center_text("Lobby: Host or Join over WiFi")
+        self.renderer.draw_lobby(self)
 
     def draw_connecting(self):
         self.renderer.draw_center_text("Connecting...")

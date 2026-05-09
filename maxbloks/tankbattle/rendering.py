@@ -17,6 +17,7 @@ Performance optimizations over the original implementation:
 
 import math
 import random
+import time
 
 from maxbloks.tankbattle import constants
 from maxbloks.tankbattle import entities
@@ -479,12 +480,23 @@ class ParticleSystem:
 class Renderer:
     """Draw world, tanks, menus, and state overlays with polished graphics."""
 
+    # Lobby colour palette (matches networktest style)
+    _LOB_COLOR_BG = (15, 15, 25)
+    _LOB_COLOR_PANEL = (30, 40, 45)
+    _LOB_COLOR_TEXT = (220, 220, 220)
+    _LOB_COLOR_DIM = (120, 120, 140)
+    _LOB_COLOR_HIGHLIGHT = (40, 100, 50)
+    _LOB_COLOR_SUCCESS = (80, 200, 120)
+    _LOB_COLOR_WARNING = (200, 180, 80)
+    _LOB_COLOR_BORDER = (40, 100, 50)
+
     def __init__(self, pygame_module, screen):
         self.pygame = pygame_module
         self.screen = screen
         self.font_menu = pygame_module.font.Font(None, constants.MENU_FONT_SIZE)
         self.font_big = pygame_module.font.Font(None, constants.BIG_FONT_SIZE)
         self.font_small = pygame_module.font.Font(None, constants.SMALL_FONT_SIZE)
+        self.font_lobby = pygame_module.font.Font(None, constants.HUD_FONT_SIZE)
         self.sprite_cache = SpriteCache(pygame_module)
         self.particles = ParticleSystem(pygame_module)
         self.terrain_surface = pygame_module.Surface(
@@ -721,6 +733,10 @@ class Renderer:
         for key in expired:
             del self.destroy_timers[key]
 
+    # ------------------------------------------------------------------
+    # Menu drawing
+    # ------------------------------------------------------------------
+
     def draw_menu(self, menu_index):
         self.screen.fill((15, 15, 25))
         border_size = 4
@@ -760,6 +776,145 @@ class Renderer:
         self.screen.blit(controls_text,
                          controls_text.get_rect(center=(constants.SCREEN_WIDTH // 2,
                                                         constants.SCREEN_HEIGHT - 20)))
+
+    # ------------------------------------------------------------------
+    # Lobby drawing — enhanced with network info and client list
+    # ------------------------------------------------------------------
+
+    def draw_lobby(self, game):
+        """Draw the enhanced lobby screen with network information.
+
+        Displays the host's IP address, WiFi network name, a list of
+        discovered clients with connection status indicators, and the
+        lobby action menu.  Inspired by the networktest app's UI.
+        """
+        sw = constants.SCREEN_WIDTH
+        sh = constants.SCREEN_HEIGHT
+        margin = 16
+        row_h = 28
+
+        # Background
+        self.screen.fill(self._LOB_COLOR_BG)
+        self.pygame.draw.rect(self.screen, self._LOB_COLOR_BORDER,
+                              (0, 0, sw, sh), 4)
+
+        y = margin
+
+        # Title
+        role_label = "HOST LOBBY" if game.lobby_is_host else "JOIN LOBBY"
+        title_surf = self.font_big.render(role_label, True, constants.COLOR_GREEN)
+        title_shadow = self.font_big.render(role_label, True, (20, 80, 30))
+        title_rect = title_surf.get_rect(center=(sw // 2, y + 22))
+        self.screen.blit(title_shadow, (title_rect.x + 2, title_rect.y + 2))
+        self.screen.blit(title_surf, title_rect)
+        y += 58
+
+        # Separator
+        self.pygame.draw.line(self.screen, self._LOB_COLOR_HIGHLIGHT,
+                              (margin, y), (sw - margin, y), 2)
+        y += 10
+
+        # Network information section
+        ip_text = f"My IP: {game.lobby_local_ip}"
+        ip_surf = self.font_lobby.render(ip_text, True, self._LOB_COLOR_SUCCESS)
+        self.screen.blit(ip_surf, (margin + 8, y))
+        y += row_h
+
+        if game.lobby_wifi_ssid:
+            wifi_text = f"WiFi: {game.lobby_wifi_ssid}"
+            wifi_surf = self.font_lobby.render(wifi_text, True, self._LOB_COLOR_SUCCESS)
+            self.screen.blit(wifi_surf, (margin + 8, y))
+        else:
+            wifi_text = "WiFi: (not detected)"
+            wifi_surf = self.font_lobby.render(wifi_text, True, self._LOB_COLOR_DIM)
+            self.screen.blit(wifi_surf, (margin + 8, y))
+        y += row_h
+
+        if game.lobby_is_host:
+            port_text = f"Listening on port: {constants.HOST_PORT}"
+            port_surf = self.font_lobby.render(port_text, True, self._LOB_COLOR_TEXT)
+            self.screen.blit(port_surf, (margin + 8, y))
+        y += row_h + 4
+
+        # Separator
+        self.pygame.draw.line(self.screen, self._LOB_COLOR_HIGHLIGHT,
+                              (margin, y), (sw - margin, y), 1)
+        y += 8
+
+        # Discovered clients / peers section
+        header_label = "Discovered Clients:" if game.lobby_is_host else "Available Hosts:"
+        header_surf = self.font_lobby.render(header_label, True, self._LOB_COLOR_TEXT)
+        self.screen.blit(header_surf, (margin + 8, y))
+        y += row_h
+
+        discovered = game.lobby_discovered_clients
+        connected = game.lobby_connected_clients
+
+        if not discovered:
+            searching_text = "Searching for devices..." if game.lobby_is_host else "Searching for hosts..."
+            search_surf = self.font_small.render(searching_text, True, self._LOB_COLOR_DIM)
+            self.screen.blit(search_surf, (margin + 24, y))
+            y += row_h
+        else:
+            for host_info in discovered:
+                ip = host_info.get("address", "???")
+                is_connected = ip in connected
+
+                # Connection status dot
+                dot_color = self._LOB_COLOR_SUCCESS if is_connected else self._LOB_COLOR_DIM
+                dot_x = margin + 24
+                dot_y_c = y + row_h // 2
+                self.pygame.draw.circle(self.screen, dot_color, (dot_x, dot_y_c), 5)
+
+                # IP address
+                ip_surf = self.font_small.render(ip, True, self._LOB_COLOR_TEXT)
+                self.screen.blit(ip_surf, (margin + 40, y))
+
+                # Connection status text
+                status = "CONNECTED" if is_connected else "available"
+                status_color = self._LOB_COLOR_SUCCESS if is_connected else self._LOB_COLOR_DIM
+                status_surf = self.font_small.render(status, True, status_color)
+                self.screen.blit(status_surf, (sw - margin - status_surf.get_width() - 8, y))
+
+                y += row_h
+
+        # Separator
+        y += 4
+        self.pygame.draw.line(self.screen, self._LOB_COLOR_HIGHLIGHT,
+                              (margin, y), (sw - margin, y), 1)
+        y += 10
+
+        # Lobby action menu (Start / Manual IP / Back)
+        for idx, item in enumerate(constants.LOBBY_ITEMS):
+            item_y = y + idx * 38
+            if idx == game.lobby_index:
+                # Selection highlight
+                highlight_rect = (margin + 4, item_y - 6, sw - 2 * margin - 8, 32)
+                self.pygame.draw.rect(self.screen, (40, 60, 45), highlight_rect, border_radius=5)
+                self.pygame.draw.rect(self.screen, constants.COLOR_GREEN, highlight_rect, 2, border_radius=5)
+
+                # Arrow indicator
+                arrow_x = margin + 12
+                self.pygame.draw.polygon(self.screen, constants.COLOR_YELLOW,
+                                         [(arrow_x, item_y - 4),
+                                          (arrow_x + 8, item_y + 8),
+                                          (arrow_x, item_y + 20)])
+
+                color = constants.COLOR_YELLOW
+            else:
+                color = self._LOB_COLOR_DIM
+
+            item_surf = self.font_lobby.render(item, True, color)
+            self.screen.blit(item_surf, item_surf.get_rect(center=(sw // 2, item_y + 10)))
+
+        # Bottom instructions
+        instructions = "D-pad/Arrows: Navigate  |  A/Enter: Select  |  B/ESC: Back  |  Btn 8/13: Quit"
+        inst_surf = self.font_small.render(instructions, True, self._LOB_COLOR_DIM)
+        self.screen.blit(inst_surf, inst_surf.get_rect(center=(sw // 2, sh - 16)))
+
+    # ------------------------------------------------------------------
+    # Other screen drawing
+    # ------------------------------------------------------------------
 
     def draw_center_text(self, message, color=constants.COLOR_WHITE):
         self.screen.fill((15, 15, 25))
