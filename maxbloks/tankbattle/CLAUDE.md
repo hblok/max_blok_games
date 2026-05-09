@@ -20,6 +20,14 @@ Each state has a dedicated `handle_input_*`, `update_*`, and `draw_*` method in 
 
 `constants.py` contains all gameplay, display, input, network, round, power-up, HUD, and color constants. `utils.py` provides reusable angle math, vector normalization, collision checks, reflections, and tile/world conversions. `entities.py` defines the core custom classes for tanks, bullets, mines, power-ups, and obstacles. `arena.py` owns procedural map generation, solid collision queries, soft obstacle restoration, camera clamping, and world-to-screen conversion. `network.py` owns packet serialization, TCP/UDP lobby scaffolding, discovery beacons, handshakes, update cadence, and dead reckoning. `hud.py` draws the HP bar, weapon display, score pips, round timer, and minimap. `game.py` coordinates state, input, combat, round flow, rendering, and network update emission. `main.py` is the `python -m maxbloks.tankbattle.main` entry point.
 
+## Input System
+
+`input.py` reads keyboard and gamepad input into an `InputState` object. The system uses rising-edge detection for all button inputs: continuous held states (`*_pressed`) are tracked each frame, and edge-detected flags (`*_just_pressed`) are computed by comparing the current frame's held state against the previous frame's. This debounce pattern prevents rapid re-triggering from controller bounce or repeated KEYDOWN events.
+
+Navigation uses the same debounce pattern: `menu_up_pressed` and `menu_down_pressed` are continuous held states, while `menu_up_just_pressed` and `menu_down_just_pressed` fire only on the rising edge, ensuring one menu step per physical button press regardless of hold duration.
+
+Controller buttons 8 (Back/Select) and 13 (Menu/Home) are mapped to `exit_pressed` / `exit_just_pressed`, which cleanly quit the game from any state.
+
 ## Network Protocol
 
 ### Discovery (UDP multicast, port 5556)
@@ -33,6 +41,8 @@ Discovery is managed by `LobbyDiscovery` in `network.py`. `NetworkManager.start_
 ### Lobby (TCP, port 5555)
 
 The handshake uses `TANKBATTLE_HELLO` with game version, player assignment, and protocol version. Reliable in-game events (round transitions, match outcome) also travel over this TCP connection as newline-delimited JSON.
+
+The lobby screen (`draw_lobby` in `rendering.py`) displays the local IP address, WiFi SSID (when detectable via nmcli), a list of discovered peers with connection status indicators, and a lobby action menu (Start / Manual IP / Back). The host also shows the listening port and attempts non-blocking TCP accept() calls in `update_lobby()` to detect incoming client connections.
 
 ### Gameplay (UDP, port 5556, 20 Hz)
 
@@ -54,4 +64,4 @@ The tests cover angle/vector math, collision helpers, tank HP changes, weapon ex
 
 ## Known Limitations and Future Improvements
 
-The implementation includes playable local simulation and the full multicast discovery protocol. The lobby screen is a stub — it does not yet display discovered hosts or allow the client to select which host to join. Future work: lobby host-selection UI, manual IP text entry as a fallback, audio playback, sprite asset art, reconnect UI polish, full host-authoritative reconciliation, and integration tests using loopback sockets.
+Future work: manual IP text entry as a fallback, audio playback, sprite asset art, reconnect UI polish, full host-authoritative reconciliation, and integration tests using loopback sockets.

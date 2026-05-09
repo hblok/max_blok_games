@@ -320,12 +320,25 @@ class NetworkManager:
     def __init__(self):
         self.role = None
         self.tcp_socket = None
+        self.tcp_socket_client = None  # accepted client connection (host side)
         self.udp_socket = None
         self.remote_address = None
         self.connected = False
         self.discovered_hosts = []
         self.last_update_sent = 0.0
         self._discovery = None
+        self.local_ip = self._get_local_ip()
+
+    def _get_local_ip(self):
+        """Get the local IP address of this device."""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "127.0.0.1"
 
     def start_host(self, host="", port=constants.HOST_PORT):
         """Start TCP host socket."""
@@ -404,9 +417,10 @@ class NetworkManager:
     def close(self):
         """Close open sockets and stop discovery."""
         self.stop_discovery()
-        for sock in (self.tcp_socket, self.udp_socket):
+        for sock in (self.tcp_socket, self.tcp_socket_client, self.udp_socket):
             if sock is not None:
                 sock.close()
         self.tcp_socket = None
+        self.tcp_socket_client = None
         self.udp_socket = None
         self.connected = False
