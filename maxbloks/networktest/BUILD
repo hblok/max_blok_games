@@ -7,7 +7,7 @@ load("//tools:py_package_wheel.bzl", "py_package_wheel")
 py_library(
     name = "networktest",
     srcs = glob(["*.py"]),
-    data = ["Network.sh", "game.json", "version.json"],
+    data = ["Networktest.sh", "game.json", "version.json"],
     deps = [
         "//maxbloks/common",
         "@games_pip_deps//pygame_ce",
