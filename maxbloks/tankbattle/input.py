@@ -1,35 +1,72 @@
 # Copyright (C) 2026 H. Blok
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Keyboard and gamepad input aggregation for TankBattle."""
+"""Keyboard and gamepad input aggregation for TankBattle.
+
+Implements button debounce via rising-edge detection so that held buttons
+only register once per press, matching the pattern from the reference
+tanks game.
+"""
 
 from maxbloks.tankbattle import constants
 from maxbloks.tankbattle import utils
 
 
 class InputState:
-    """Aggregated keyboard and gamepad input."""
+    """Aggregated keyboard and gamepad input.
+
+    Continuous (held) fields end in ``_pressed``; edge-detected
+    (just-pressed) fields end in ``_just_pressed``.  UI handlers
+    should prefer the ``_just_pressed`` variants to avoid bounce.
+    """
 
     def __init__(self):
+        # Movement axes (continuous)
         self.drive = 0.0
         self.turn = 0.0
         self.turret_x = 0.0
         self.turret_y = 0.0
-        self.fire_primary = False
-        self.fire_secondary = False
-        self.pause = False
-        self.confirm = False
+
+        # Continuous (held) button states
+        self.fire_primary_pressed = False
+        self.fire_secondary_pressed = False
+        self.pause_pressed = False
+        self.confirm_pressed = False
+
+        # Edge-detected (rising-edge) button states — True only on
+        # the frame the button transitions from released to pressed.
+        self.fire_primary_just_pressed = False
+        self.fire_secondary_just_pressed = False
+        self.pause_just_pressed = False
+        self.confirm_just_pressed = False
+
+        # Navigation (one-shot per event)
         self.menu_y = 0
         self.quit = False
 
 
 class InputReader:
-    """Read keyboard and gamepad state into an InputState."""
+    """Read keyboard and gamepad state into an InputState.
+
+    Button debounce is implemented by tracking the previous-frame
+    held state of each button and computing a rising-edge flag
+    (``just_pressed``) that is True only on the first frame a button
+    is held.  This prevents rapid re-triggering from controller
+    bounce or repeated KEYDOWN events.
+    """
 
     def __init__(self, pygame_module):
         self.pygame = pygame_module
         self._joystick = None
         self._joystick_initialized = False
+        # Previous-frame held states for debounce
+        self._prev_fire_primary = False
+        self._prev_fire_secondary = False
+        self._prev_pause = False
+        self._prev_confirm = False
+        # Turret input smoothing (low-pass filter)
+        self._smooth_turret_x = 0.0
+        self._smooth_turret_y = 0.0
         self._init_joystick()
 
     def _init_joystick(self):
@@ -63,17 +100,50 @@ class InputReader:
             self._joystick_initialized = False
 
     def read(self):
-        """Return current input state."""
+        """Return current input state with edge-detected buttons."""
         state = InputState()
         self._read_events(state)
         self._read_keyboard_axes(state)
         self._read_joystick(state)
+        # Normalize movement axes
         state.drive, state.turn = utils.normalize_input_vector(state.drive, state.turn)
-        state.turret_x, state.turret_y = utils.normalize_input_vector(
-            state.turret_x,
-            state.turret_y,
+        # Smooth turret input to prevent jitter and cardinal-direction snapping
+        state.turret_x, state.turret_y = self._smooth_turret_input(
+            utils.normalize_input_vector(state.turret_x, state.turret_y),
         )
+        # Compute rising-edge (just_pressed) flags for debounce
+        state.fire_primary_just_pressed = (
+            state.fire_primary_pressed and not self._prev_fire_primary
+        )
+        state.fire_secondary_just_pressed = (
+            state.fire_secondary_pressed and not self._prev_fire_secondary
+        )
+        state.pause_just_pressed = (
+            state.pause_pressed and not self._prev_pause
+        )
+        state.confirm_just_pressed = (
+            state.confirm_pressed and not self._prev_confirm
+        )
+        # Store current held states for next frame's edge detection
+        self._prev_fire_primary = state.fire_primary_pressed
+        self._prev_fire_secondary = state.fire_secondary_pressed
+        self._prev_pause = state.pause_pressed
+        self._prev_confirm = state.confirm_pressed
         return state
+
+    def _smooth_turret_input(self, raw_vector):
+        """Apply exponential smoothing to turret input to reduce jitter.
+
+        This prevents the turret from snapping erratically when the
+        right stick is near the deadzone boundary or when controller
+        noise causes rapid direction changes.
+        """
+        smoothing = constants.TURRET_INPUT_SMOOTHING
+        sx = self._smooth_turret_x * smoothing + raw_vector[0] * (1.0 - smoothing)
+        sy = self._smooth_turret_y * smoothing + raw_vector[1] * (1.0 - smoothing)
+        self._smooth_turret_x = sx
+        self._smooth_turret_y = sy
+        return sx, sy
 
     def _read_events(self, state):
         for event in self.pygame.event.get():
@@ -85,6 +155,8 @@ class InputReader:
                 pass
             elif event.type == self.pygame.JOYBUTTONDOWN:
                 self._read_joybutton(event, state)
+            elif event.type == self.pygame.JOYBUTTONUP:
+                pass
             elif event.type == self.pygame.JOYDEVICEADDED:
                 self._check_joystick_reconnect()
             elif event.type == self.pygame.JOYDEVICEREMOVED:
@@ -93,13 +165,13 @@ class InputReader:
 
     def _read_keydown(self, event, state):
         if event.key == self.pygame.K_ESCAPE:
-            state.pause = True
+            state.pause_pressed = True
         if event.key in (self.pygame.K_RETURN, self.pygame.K_SPACE):
-            state.confirm = True
+            state.confirm_pressed = True
         if event.key == self.pygame.K_SPACE:
-            state.fire_primary = True
+            state.fire_primary_pressed = True
         if event.key in (self.pygame.K_LCTRL, self.pygame.K_RCTRL):
-            state.fire_secondary = True
+            state.fire_secondary_pressed = True
         if event.key in (self.pygame.K_UP, self.pygame.K_w):
             state.menu_y = -1
         if event.key in (self.pygame.K_DOWN, self.pygame.K_s):
@@ -141,15 +213,56 @@ class InputReader:
             elif num_axes >= 6:
                 right_x = utils.apply_deadzone(self._joystick.get_axis(3))
                 right_y = utils.apply_deadzone(self._joystick.get_axis(4))
+            # Left stick drives the tank via move-toward-stick scheme
             state.turn += left_x
             state.drive += left_y
             if abs(right_x) > 0.0 or abs(right_y) > 0.0:
                 state.turret_x += right_x
                 state.turret_y += right_y
+            # Read joystick button held states via polling
+            self._read_joystick_buttons(state)
             self._read_joystick_hat(state)
         except Exception:
             self._joystick = None
             self._joystick_initialized = False
+
+    def _read_joystick_buttons(self, state):
+        """Read current held state of joystick buttons via polling.
+
+        Rather than reacting to individual JOYBUTTONDOWN events (which
+        can bounce on some controllers), we poll the current held state
+        each frame and rely on the rising-edge detection in ``read()``
+        to debounce.
+        """
+        if not self._joystick_initialized or self._joystick is None:
+            return
+        try:
+            num_buttons = self._joystick.get_numbuttons()
+            if num_buttons > 0 and self._joystick.get_button(0):
+                state.fire_primary_pressed = True
+                state.confirm_pressed = True
+            if num_buttons > 1 and self._joystick.get_button(1):
+                state.fire_secondary_pressed = True
+                state.confirm_pressed = True
+            if num_buttons > 4 and self._joystick.get_button(4):
+                state.fire_primary_pressed = True
+            if num_buttons > 5 and self._joystick.get_button(5):
+                state.fire_primary_pressed = True
+            if num_buttons > 6 and self._joystick.get_button(6):
+                state.fire_secondary_pressed = True
+            if num_buttons > 7 and self._joystick.get_button(7):
+                state.pause_pressed = True
+                state.fire_secondary_pressed = True
+            if num_buttons > 8 and self._joystick.get_button(8):
+                state.pause_pressed = True
+            if num_buttons > 9 and self._joystick.get_button(9):
+                state.pause_pressed = True
+            if num_buttons > 10 and self._joystick.get_button(10):
+                state.pause_pressed = True
+            if num_buttons > 13 and self._joystick.get_button(13):
+                state.pause_pressed = True
+        except Exception:
+            pass
 
     def _read_joystick_hat(self, state):
         if not self._joystick_initialized or self._joystick is None:
@@ -169,18 +282,12 @@ class InputReader:
             pass
 
     def _read_joybutton(self, event, state):
-        if event.button in (0, 1):
-            state.confirm = True
-        if event.button == 0:
-            state.fire_primary = True
-        if event.button == 1:
-            state.fire_secondary = True
-        if event.button in (6, 7):
-            state.fire_secondary = True
-        if event.button in (4, 5):
-            state.fire_primary = True
-        if event.button in (7, 8, 13, 9, 10):
-            state.pause = True
+        """Handle JOYBUTTONDOWN events for menu navigation only.
+
+        Continuous button held state is now read via polling in
+        ``_read_joystick_buttons``.  This handler only sets
+        one-shot navigation events (menu_y) that don't need debounce.
+        """
         if event.button in (11, 12):
             if event.button == 11:
                 state.menu_y = -1

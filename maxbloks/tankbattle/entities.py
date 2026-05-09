@@ -5,6 +5,7 @@
 
 import dataclasses
 import enum
+import math
 
 from maxbloks.tankbattle import constants
 from maxbloks.tankbattle import utils
@@ -41,7 +42,18 @@ class ObstacleType(enum.Enum):
 
 @dataclasses.dataclass
 class Tank:
-    """Top-down tank with independent body and turret orientation."""
+    """Top-down tank with independent body and turret orientation.
+
+    Body rotation uses the *move-toward-stick* scheme: the tank
+    gradually rotates to face the direction indicated by the left
+    stick, then drives forward.  This is more intuitive than classic
+    tank-style separate drive/turn controls, especially on handheld
+    controllers.
+
+    Turret rotation is also gradual, with its own rotation speed,
+    preventing the instant-snap behaviour that caused cardinal-
+    direction snapping on controllers.
+    """
 
     x: float
     y: float
@@ -50,6 +62,7 @@ class Tank:
     hp: int = constants.TANK_MAX_HP
     speed: float = constants.TANK_SPEED
     rotation_speed: float = constants.TANK_ROTATION_SPEED
+    turret_rotation_speed: float = constants.TURRET_ROTATION_SPEED
     active_weapon: WeaponType = WeaponType.PRIMARY
     weapon_timer: float = 0.0
     weapon_shots: int = 0
@@ -83,8 +96,115 @@ class Tank:
             self.body_angle + direction * self.rotation_speed * dt
         )
 
+    def move_toward_direction(self, axis_x, axis_y, dt, arena):
+        """Move tank toward the direction indicated by the stick.
+
+        This implements the *move-toward-stick* control scheme from
+        the reference tanks game: the left-stick direction is
+        converted to a target angle, the body gradually rotates
+        toward it, and the tank drives forward in the direction it
+        is currently facing.  When the stick is neutral the tank
+        stops rotating and driving.
+
+        A diagonal boost is applied when both axes are significantly
+        deflected, compensating for the reduced magnitude that
+        circular stick gates produce on diagonals.
+        """
+        magnitude = math.hypot(axis_x, axis_y)
+        if magnitude < constants.JOYSTICK_DEADZONE:
+            return
+
+        # Apply diagonal sensitivity boost (from reference tanks game)
+        boosted_x, boosted_y = self._apply_diagonal_boost(axis_x, axis_y)
+
+        # Convert stick direction to target angle (0 = north convention)
+        target_angle = utils.vector_to_angle(boosted_x, boosted_y)
+
+        # Gradually rotate body toward target angle
+        self._rotate_body_toward(target_angle, dt)
+
+        # Drive forward in the direction the body is now facing,
+        # scaled by how closely the body aligns with the target.
+        # This prevents full-speed strafing while turning.
+        alignment = self._alignment_factor(target_angle)
+        self.move(alignment, dt, arena)
+
+    def _apply_diagonal_boost(self, axis_x, axis_y):
+        """Boost diagonal sensitivity to match reference tanks game.
+
+        When both axes are significantly deflected, the magnitude
+        is boosted by the diagonal_sensitivity factor, compensating
+        for the reduced magnitude that circular stick gates produce.
+        """
+        magnitude = math.hypot(axis_x, axis_y)
+        if magnitude < 0.01:
+            return axis_x, axis_y
+        is_diagonal = abs(axis_x) > 0.3 and abs(axis_y) > 0.3
+        if is_diagonal:
+            boost = constants.DIAGONAL_SENSITIVITY
+            norm_x = axis_x / magnitude
+            norm_y = axis_y / magnitude
+            boosted_magnitude = min(magnitude * boost, 1.0)
+            return norm_x * boosted_magnitude, norm_y * boosted_magnitude
+        return axis_x, axis_y
+
+    def _rotate_body_toward(self, target_angle, dt):
+        """Gradually rotate the body toward a target angle.
+
+        Uses the shortest-arc rotation to avoid spinning the long
+        way around.  If the remaining angle delta is smaller than
+        one frame's rotation step, snap directly to the target.
+        """
+        diff = utils.shortest_angle_delta(self.body_angle, target_angle)
+        max_step = self.rotation_speed * dt
+        if abs(diff) <= max_step:
+            self.body_angle = utils.normalize_angle(target_angle)
+        else:
+            self.body_angle = utils.normalize_angle(
+                self.body_angle + (max_step if diff > 0 else -max_step)
+            )
+
+    def _alignment_factor(self, target_angle):
+        """Return how closely the body faces the target direction.
+
+        Returns a value in [0, 1]: 1.0 when perfectly aligned,
+        tapering toward 0.0 when facing away.  This prevents the
+        tank from driving at full speed while sideways to the
+        intended direction.
+        """
+        diff = abs(utils.shortest_angle_delta(self.body_angle, target_angle))
+        # Smooth ramp: full speed within ~30 degrees of target
+        if diff < 30.0:
+            return 1.0
+        # Taper down to 0.3 at 90 degrees (still allows slow turning movement)
+        if diff < 90.0:
+            return 1.0 - 0.7 * ((diff - 30.0) / 60.0)
+        return 0.3
+
+    def rotate_turret_toward(self, target_angle, dt):
+        """Gradually rotate the turret toward a target angle.
+
+        Unlike ``set_turret_from_vector`` which instantly snaps the
+        turret, this method smoothly rotates at
+        ``turret_rotation_speed`` degrees per second, preventing
+        the jarring cardinal-direction snapping that occurs with
+        raw controller input.
+        """
+        diff = utils.shortest_angle_delta(self.turret_angle, target_angle)
+        max_step = self.turret_rotation_speed * dt
+        if abs(diff) <= max_step:
+            self.turret_angle = utils.normalize_angle(target_angle)
+        else:
+            self.turret_angle = utils.normalize_angle(
+                self.turret_angle + (max_step if diff > 0 else -max_step)
+            )
+
     def set_turret_from_vector(self, x_value, y_value):
-        """Aim turret from a non-neutral right-stick vector."""
+        """Aim turret from a non-neutral right-stick vector.
+
+        Kept for backward compatibility (e.g. AI usage) where
+        instant snapping is acceptable.
+        """
         if x_value != 0.0 or y_value != 0.0:
             self.turret_angle = utils.vector_to_angle(x_value, y_value)
 

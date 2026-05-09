@@ -148,7 +148,7 @@ class TankBattleGame:
     def handle_input_menu(self, input_state):
         if input_state.menu_y:
             self.menu_index = (self.menu_index + input_state.menu_y) % len(constants.MENU_ITEMS)
-        if input_state.confirm:
+        if input_state.confirm_just_pressed:
             if self.menu_index == 0:
                 self.single_player = True
                 self.start_match()
@@ -163,49 +163,71 @@ class TankBattleGame:
                 self.running = False
 
     def handle_input_lobby(self, input_state):
-        if input_state.pause:
+        if input_state.pause_just_pressed:
             self.net.stop_discovery()
             self.state = GameState.MENU
-        if input_state.confirm:
+        if input_state.confirm_just_pressed:
             self.net.stop_discovery()
             self.start_match()
 
     def handle_input_connecting(self, input_state):
-        if input_state.pause:
+        if input_state.pause_just_pressed:
             self.state = GameState.LOBBY
 
     def handle_input_countdown(self, input_state):
-        if input_state.pause:
+        if input_state.pause_just_pressed:
             self.state = GameState.PAUSED
 
     def handle_input_playing(self, input_state):
-        if input_state.pause:
+        if input_state.pause_just_pressed:
             self.state = GameState.PAUSED
             return
         self.pending_input = input_state
 
     def handle_input_paused(self, input_state):
-        if input_state.pause or input_state.confirm:
+        if input_state.pause_just_pressed or input_state.confirm_just_pressed:
             self.state = GameState.PLAYING
 
     def handle_input_round_over(self, input_state):
-        if input_state.confirm:
+        if input_state.confirm_just_pressed:
             self._advance_after_round()
 
     def handle_input_match_over(self, input_state):
-        if input_state.confirm:
+        if input_state.confirm_just_pressed:
             self.round_wins = [0, 0]
             self.single_player = False
             self.state = GameState.MENU
 
     def _apply_tank_input(self, input_state, dt):
+        """Apply player input to the local tank.
+
+        Uses the *move-toward-stick* scheme: the left stick direction
+        determines where the tank should face and drive, with
+        gradual body rotation.  The right stick (smoothed) aims the
+        turret with gradual rotation.  Both fire buttons use edge-
+        detected inputs to prevent bounce.
+        """
         tank = self.local_tank
-        tank.rotate_body(input_state.turn, dt)
-        tank.move(-input_state.drive, dt, self.arena)
-        tank.set_turret_from_vector(input_state.turret_x, input_state.turret_y)
-        if input_state.fire_primary:
+
+        # Move-toward-stick: left stick direction controls body
+        # orientation and forward movement.  turn (left_x) is the
+        # horizontal component, drive (left_y) is the vertical
+        # component — note the argument order matches (x, y).
+        tank.move_toward_direction(input_state.turn, input_state.drive, dt, self.arena)
+
+        # Smooth turret aiming: right stick direction (already
+        # smoothed in InputReader) is converted to a target angle
+        # and the turret gradually rotates toward it.
+        if input_state.turret_x != 0.0 or input_state.turret_y != 0.0:
+            target_angle = utils.vector_to_angle(input_state.turret_x, input_state.turret_y)
+            tank.rotate_turret_toward(target_angle, dt)
+
+        # Edge-detected fire: only fires on the rising edge of the
+        # button press, preventing bounce from registering multiple
+        # shots from a single physical press.
+        if input_state.fire_primary_just_pressed:
             self._fire_weapon(tank)
-        if input_state.fire_secondary:
+        if input_state.fire_secondary_just_pressed:
             self._drop_mine(tank)
 
     def update_menu(self, dt):

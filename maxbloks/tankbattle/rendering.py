@@ -1,9 +1,22 @@
 # Copyright (C) 2026 H. Blok
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Rendering helpers for TankBattle with polished visual effects."""
+"""Rendering helpers for TankBattle with polished visual effects.
+
+Performance optimizations over the original implementation:
+  - SpriteCache pre-builds turret surfaces (no per-frame allocation).
+  - ParticleSystem reuses a small pool of SRCALPHA surfaces instead
+    of creating a new surface for every particle every frame.
+  - Powerup rendering uses a cached set of pre-scaled surfaces at
+    discrete pulse phases instead of calling transform.scale every
+    frame.
+  - Hit-flash and ricochet-glow surfaces are cached once.
+  - Tile building uses batch pygame.draw calls instead of per-pixel
+    set_at() loops.
+"""
 
 import math
+import random
 
 from maxbloks.tankbattle import constants
 from maxbloks.tankbattle import entities
@@ -20,47 +33,66 @@ class SpriteCache:
         self._build_hard_rock_tile()
         self._build_soft_obstacle_tile()
         self._build_tank_surfaces()
+        self._build_turret_surfaces()
         self._build_bullet_surface()
         self._build_rocket_surface()
         self._build_mine_surface()
         self._build_powerup_surfaces()
+        self._build_powerup_pulse_frames()
+        self._build_hit_flash_surface()
+        self._build_ricochet_glow_surface()
+        self._build_destroyed_hull_surface()
+
+    # ------------------------------------------------------------------
+    # Tile builders — using batch draw calls instead of per-pixel set_at
+    # ------------------------------------------------------------------
 
     def _build_terrain_tile(self):
-        tile = self.pygame.Surface((constants.TILE_SIZE, constants.TILE_SIZE))
+        size = constants.TILE_SIZE
+        tile = self.pygame.Surface((size, size))
+        tile.fill(constants.COLOR_BG)
+        # Subtle noise via small scattered dots instead of per-pixel loop
+        rng = random.Random(42)
         base_r, base_g, base_b = constants.COLOR_BG
-        for row in range(constants.TILE_SIZE):
-            for col in range(constants.TILE_SIZE):
-                noise = ((col * 7 + row * 13) % 17 - 8)
-                r = max(0, min(255, base_r + noise))
-                g = max(0, min(255, base_g + noise))
-                b = max(0, min(255, base_b + noise // 2))
-                tile.set_at((col, row), (r, g, b))
-        for edge_x in range(0, constants.TILE_SIZE, 6):
-            for edge_y in range(0, constants.TILE_SIZE, 6):
-                if (edge_x + edge_y) % 12 < 3:
-                    current = tile.get_at((min(edge_x, constants.TILE_SIZE - 1),
-                                           min(edge_y, constants.TILE_SIZE - 1)))
-                    darkened = (max(0, current[0] - 4), max(0, current[1] - 4), current[2])
-                    tile.set_at((min(edge_x, constants.TILE_SIZE - 1),
-                                 min(edge_y, constants.TILE_SIZE - 1)), darkened)
+        for _ in range(40):
+            px = rng.randrange(size)
+            py = rng.randrange(size)
+            noise = rng.randint(-6, 6)
+            color = (
+                max(0, min(255, base_r + noise)),
+                max(0, min(255, base_g + noise)),
+                max(0, min(255, base_b + noise // 2)),
+            )
+            self.pygame.draw.circle(tile, color, (px, py), 1)
+        # A few darker spots for variety
+        darker = (max(0, base_r - 8), max(0, base_g - 8), base_b)
+        for _ in range(12):
+            px = rng.randrange(size)
+            py = rng.randrange(size)
+            self.pygame.draw.circle(tile, darker, (px, py), 1)
         self._cache["terrain_tile"] = tile
 
     def _build_hard_rock_tile(self):
         size = constants.TILE_SIZE
         tile = self.pygame.Surface((size, size))
         tile.fill(constants.COLOR_HARD)
+        # Surface detail using draw calls instead of per-pixel set_at
         hr, hg, hb = constants.COLOR_HARD
-        for row in range(size):
-            for col in range(size):
-                variation = ((col * 11 + row * 7 + col * row) % 13 - 6)
-                r = max(0, min(255, hr + variation))
-                g = max(0, min(255, hg + variation))
-                b = max(0, min(255, hb + variation))
-                tile.set_at((col, row), (r, g, b))
+        rng = random.Random(7)
+        for _ in range(20):
+            px = rng.randrange(1, size - 1)
+            py = rng.randrange(1, size - 1)
+            variation = rng.randint(-6, 6)
+            color = (
+                max(0, min(255, hr + variation)),
+                max(0, min(255, hg + variation)),
+                max(0, min(255, hb + variation)),
+            )
+            self.pygame.draw.circle(tile, color, (px, py), 1)
         highlight = tuple(min(255, c + 30) for c in constants.COLOR_HARD)
+        shadow = tuple(max(0, c - 25) for c in constants.COLOR_HARD)
         self.pygame.draw.line(tile, highlight, (0, 0), (size - 1, 0), 1)
         self.pygame.draw.line(tile, highlight, (0, 0), (0, size - 1), 1)
-        shadow = tuple(max(0, c - 25) for c in constants.COLOR_HARD)
         self.pygame.draw.line(tile, shadow, (size - 1, 1), (size - 1, size - 1), 1)
         self.pygame.draw.line(tile, shadow, (1, size - 1), (size - 1, size - 1), 1)
         self.pygame.draw.rect(tile, shadow, (0, 0, size, size), 1)
@@ -70,26 +102,35 @@ class SpriteCache:
         size = constants.TILE_SIZE
         tile = self.pygame.Surface((size, size))
         tile.fill(constants.COLOR_SOFT)
+        # Surface detail
         sr, sg, sb = constants.COLOR_SOFT
-        for row in range(size):
-            for col in range(size):
-                variation = ((col * 3 + row * 5) % 9 - 4)
-                r = max(0, min(255, sr + variation))
-                g = max(0, min(255, sg + variation))
-                b = max(0, min(255, sb + variation // 2))
-                tile.set_at((col, row), (r, g, b))
+        rng = random.Random(13)
+        for _ in range(15):
+            px = rng.randrange(1, size - 1)
+            py = rng.randrange(1, size - 1)
+            variation = rng.randint(-4, 4)
+            color = (
+                max(0, min(255, sr + variation)),
+                max(0, min(255, sg + variation)),
+                max(0, min(255, sb + variation // 2)),
+            )
+            self.pygame.draw.circle(tile, color, (px, py), 1)
         darker_soft = tuple(max(0, c - 20) for c in constants.COLOR_SOFT)
         for crack_y in range(4, size - 2, 7):
             start_x = (crack_y * 3) % (size // 2)
             self.pygame.draw.line(tile, darker_soft, (start_x, crack_y),
                                   (min(start_x + 8, size - 1), crack_y + 2), 1)
         highlight = tuple(min(255, c + 25) for c in constants.COLOR_SOFT)
+        shadow = tuple(max(0, c - 20) for c in constants.COLOR_SOFT)
         self.pygame.draw.line(tile, highlight, (0, 0), (size - 1, 0), 1)
         self.pygame.draw.line(tile, highlight, (0, 0), (0, size - 1), 1)
-        shadow = tuple(max(0, c - 20) for c in constants.COLOR_SOFT)
         self.pygame.draw.line(tile, shadow, (size - 1, 1), (size - 1, size - 1), 1)
         self.pygame.draw.line(tile, shadow, (1, size - 1), (size - 1, size - 1), 1)
         self._cache["soft_obstacle_tile"] = tile
+
+    # ------------------------------------------------------------------
+    # Tank body surfaces
+    # ------------------------------------------------------------------
 
     def _build_tank_surfaces(self):
         for color_key, base_color in [("green", constants.COLOR_GREEN), ("red", constants.COLOR_RED)]:
@@ -146,6 +187,47 @@ class SpriteCache:
             self._cache[f"tank_{color_key}"] = final
             self._cache[f"tank_{color_key}_size"] = total_size
 
+    # ------------------------------------------------------------------
+    # Turret surfaces — cached at init instead of created every frame
+    # ------------------------------------------------------------------
+
+    def _build_turret_surfaces(self):
+        """Pre-render turret surfaces for each tank color.
+
+        These are blitted and rotated each frame, but the base
+        surface is created only once.
+        """
+        for color_key, base_color in [("green", constants.COLOR_GREEN), ("red", constants.COLOR_RED)]:
+            dark_color = tuple(max(0, c - 50) for c in base_color)
+            mid_color = tuple(max(0, c - 25) for c in base_color)
+            light_color = tuple(min(255, c + 40) for c in base_color)
+            size = 48
+            surface = self.pygame.Surface((size, size), self.pygame.SRCALPHA)
+            cx, cy = size // 2, size // 2
+            turret_w = constants.TANK_TURRET_WIDTH
+            turret_h = constants.TANK_BODY_HEIGHT
+            barrel_rect = (cx - turret_w // 2, cy - turret_h // 2, turret_w, turret_h)
+            self.pygame.draw.rect(surface, base_color, barrel_rect, border_radius=2)
+            self.pygame.draw.rect(surface, dark_color, barrel_rect, 1, border_radius=2)
+            self.pygame.draw.line(surface, light_color,
+                                  (barrel_rect[0] + 2, barrel_rect[1] + 1),
+                                  (barrel_rect[0] + barrel_rect[2] - 2, barrel_rect[1] + 1), 1)
+            muzzle_w = turret_w + 4
+            muzzle_h = 5
+            muzzle_rect = (cx - muzzle_w // 2, cy - turret_h // 2 - muzzle_h, muzzle_w, muzzle_h)
+            self.pygame.draw.rect(surface, dark_color, muzzle_rect, border_radius=1)
+            self.pygame.draw.rect(surface, mid_color,
+                                  (cx - turret_w // 2 - 1, cy - 6, turret_w + 2, 12),
+                                  border_radius=3)
+            self.pygame.draw.rect(surface, dark_color,
+                                  (cx - turret_w // 2 - 1, cy - 6, turret_w + 2, 12),
+                                  1, border_radius=3)
+            self._cache[f"turret_{color_key}"] = surface
+
+    # ------------------------------------------------------------------
+    # Projectile and item surfaces
+    # ------------------------------------------------------------------
+
     def _build_bullet_surface(self):
         size = 12
         surface = self.pygame.Surface((size, size), self.pygame.SRCALPHA)
@@ -189,11 +271,10 @@ class SpriteCache:
             center = size // 2
             if power_type == entities.PowerUpType.HEALTH:
                 bg_color = (50, 200, 80)
-                symbol_color = (255, 255, 255)
                 self.pygame.draw.circle(surface, bg_color, (center, center), 9)
                 self.pygame.draw.circle(surface, (30, 160, 60), (center, center), 9, 2)
-                self.pygame.draw.rect(surface, symbol_color, (center - 1, center - 5, 3, 10))
-                self.pygame.draw.rect(surface, symbol_color, (center - 5, center - 1, 10, 3))
+                self.pygame.draw.rect(surface, (255, 255, 255), (center - 1, center - 5, 3, 10))
+                self.pygame.draw.rect(surface, (255, 255, 255), (center - 5, center - 1, 10, 3))
             elif power_type == entities.PowerUpType.SPREAD_SHOT:
                 bg_color = (80, 180, 220)
                 self.pygame.draw.circle(surface, bg_color, (center, center), 9)
@@ -235,16 +316,99 @@ class SpriteCache:
                 self.pygame.draw.circle(surface, (70, 70, 70), (center, center), 4, 1)
             self._cache[f"powerup_{power_type.value}"] = surface
 
+    def _build_powerup_pulse_frames(self):
+        """Pre-compute scaled powerup surfaces at discrete pulse phases.
+
+        Instead of calling pygame.transform.scale every frame, we
+        pre-build a small number of frames and cycle through them.
+        """
+        num_frames = 8
+        for power_type in entities.PowerUpType:
+            base_key = f"powerup_{power_type.value}"
+            base_surface = self._cache.get(base_key)
+            if base_surface is None:
+                continue
+            frames = []
+            for i in range(num_frames):
+                # Mimic: pulse = 1.0 + 0.15 * sin(timer * 2.0)
+                phase = i / num_frames * 2.0 * math.pi
+                pulse = 1.0 + 0.15 * math.sin(phase)
+                new_w = max(1, int(base_surface.get_width() * pulse))
+                new_h = max(1, int(base_surface.get_height() * pulse))
+                scaled = self.pygame.transform.scale(base_surface, (new_w, new_h))
+                # Also pre-build the glow for this frame
+                glow_w = new_w + 8
+                glow_h = new_h + 8
+                glow_surf = self.pygame.Surface((glow_w, glow_h), self.pygame.SRCALPHA)
+                self.pygame.draw.circle(
+                    glow_surf, (255, 255, 100, constants.POWERUP_GLOW_ALPHA),
+                    (glow_w // 2, glow_h // 2), new_w // 2 + 3,
+                )
+                frames.append((scaled, glow_surf))
+            self._cache[f"powerup_frames_{power_type.value}"] = frames
+
+    def _build_hit_flash_surface(self):
+        """Pre-build the hit-flash overlay surface."""
+        radius = int(constants.TANK_HITBOX_RADIUS + 4)
+        diameter = radius * 2
+        surface = self.pygame.Surface((diameter, diameter), self.pygame.SRCALPHA)
+        self.pygame.draw.circle(surface, (255, 255, 255, 120), (radius, radius),
+                                int(constants.TANK_HITBOX_RADIUS + 2))
+        self._cache["hit_flash"] = surface
+        self._cache["hit_flash_radius"] = radius
+
+    def _build_ricochet_glow_surface(self):
+        """Pre-build the ricochet bullet glow surface."""
+        surface = self.pygame.Surface((16, 16), self.pygame.SRCALPHA)
+        self.pygame.draw.circle(surface, (180, 80, 220, 80), (8, 8), 6)
+        self.pygame.draw.circle(surface, (220, 150, 255), (8, 8), 3)
+        self._cache["ricochet_glow"] = surface
+
+    def _build_destroyed_hull_surface(self):
+        """Pre-build the destroyed tank hull surface."""
+        surface = self.pygame.Surface((32, 32), self.pygame.SRCALPHA)
+        self.pygame.draw.polygon(surface, (60, 60, 60, 180),
+                                 [(16, 4), (4, 16), (10, 28), (22, 28), (28, 16)])
+        self.pygame.draw.polygon(surface, (40, 40, 40, 150),
+                                 [(16, 4), (4, 16), (10, 28), (22, 28), (28, 16)], 2)
+        self._cache["destroyed_hull"] = surface
+
     def get(self, key):
         return self._cache.get(key)
 
 
 class ParticleSystem:
-    """Simple particle system for explosions and effects."""
+    """Simple particle system for explosions and effects.
+
+    Uses a pool of pre-allocated SRCALPHA surfaces to avoid
+    creating a new surface for every particle every frame.
+    """
+
+    _POOL_SIZES = [2, 3, 4, 5, 6]  # Pre-allocated particle radii
 
     def __init__(self, pygame_module):
         self.pygame = pygame_module
         self.particles = []
+        # Pre-allocate a pool of SRCALPHA surfaces at various sizes
+        self._pool = {}
+        for size in self._POOL_SIZES:
+            diameter = size * 2
+            surf = self.pygame.Surface((diameter, diameter), self.pygame.SRCALPHA)
+            self._pool[size] = surf
+
+    def _get_particle_surface(self, size):
+        """Return a reusable surface for a particle of the given size.
+
+        Falls back to creating a new one if the pool doesn't have
+        the exact size, but the common sizes are pre-allocated.
+        """
+        if size in self._pool:
+            return self._pool[size]
+        # Rare: allocate for an unexpected size and cache it
+        diameter = size * 2
+        surf = self.pygame.Surface((diameter, diameter), self.pygame.SRCALPHA)
+        self._pool[size] = surf
+        return surf
 
     def emit_explosion(self, x, y, color, count=12, speed=80.0, lifetime=0.5):
         for _ in range(count):
@@ -306,12 +470,11 @@ class ParticleSystem:
             if -10 < sx < constants.SCREEN_WIDTH + 10 and -10 < sy < constants.SCREEN_HEIGHT + 10:
                 size = max(1, int(p["size"] * (p["life"] / p["max_life"])))
                 color = p["color"]
-                surf = self.pygame.Surface((size * 2, size * 2), self.pygame.SRCALPHA)
+                surf = self._get_particle_surface(size)
+                surf.fill((0, 0, 0, 0))  # Clear the reusable surface
                 self.pygame.draw.circle(surf, (*color, alpha), (size, size), size)
                 screen.blit(surf, (sx - size, sy - size))
 
-
-import random
 
 class Renderer:
     """Draw world, tanks, menus, and state overlays with polished graphics."""
@@ -331,6 +494,7 @@ class Renderer:
         self._build_terrain_pattern()
         self.flash_timer = 0.0
         self.destroy_timers = {}
+        self._powerup_frame_index = 0.0
 
     def _build_terrain_pattern(self):
         tile = self.sprite_cache.get("terrain_tile")
@@ -374,6 +538,7 @@ class Renderer:
                                       (int(sx), int(sy), constants.TILE_SIZE, constants.TILE_SIZE))
 
     def _draw_powerups(self, game, camera):
+        """Draw powerups using pre-computed pulse frames."""
         for powerup in game.powerups:
             sx, sy = game.arena.world_to_screen(powerup.position, camera)
             isx, isy = int(sx), int(sy)
@@ -381,23 +546,13 @@ class Renderer:
                 continue
             if isy < -20 or isy > constants.SCREEN_HEIGHT + 20:
                 continue
-            pulse = 1.0 + 0.15 * math.sin(powerup.pulse_timer * 2.0)
-            key = f"powerup_{powerup.type.value}"
-            surface = self.sprite_cache.get(key)
-            if surface:
-                scaled = self.pygame.transform.scale(
-                    surface,
-                    (int(surface.get_width() * pulse), int(surface.get_height() * pulse)),
-                )
-                glow_surf = self.pygame.Surface(
-                    (scaled.get_width() + 8, scaled.get_height() + 8), self.pygame.SRCALPHA
-                )
-                glow_color = (255, 255, 100, 40)
-                self.pygame.draw.circle(
-                    glow_surf, glow_color,
-                    (glow_surf.get_width() // 2, glow_surf.get_height() // 2),
-                    scaled.get_width() // 2 + 3,
-                )
+            # Look up pre-computed frames
+            frames_key = f"powerup_frames_{powerup.type.value}"
+            frames = self.sprite_cache.get(frames_key)
+            if frames:
+                # Map pulse_timer to a frame index
+                phase_index = int((powerup.pulse_timer * 2.0 / (2.0 * math.pi)) * len(frames)) % len(frames)
+                scaled, glow_surf = frames[phase_index]
                 self.screen.blit(glow_surf,
                                  (isx - glow_surf.get_width() // 2,
                                   isy - glow_surf.get_height() // 2))
@@ -405,7 +560,15 @@ class Renderer:
                                  (isx - scaled.get_width() // 2,
                                   isy - scaled.get_height() // 2))
             else:
-                self.pygame.draw.circle(self.screen, constants.COLOR_YELLOW, (isx, isy), 8)
+                # Fallback to base surface without pulse
+                key = f"powerup_{powerup.type.value}"
+                surface = self.sprite_cache.get(key)
+                if surface:
+                    self.screen.blit(surface,
+                                     (isx - surface.get_width() // 2,
+                                      isy - surface.get_height() // 2))
+                else:
+                    self.pygame.draw.circle(self.screen, constants.COLOR_YELLOW, (isx, isy), 8)
 
     def _draw_mines(self, game, camera):
         for mine in game.mines:
@@ -426,6 +589,7 @@ class Renderer:
                 self.pygame.draw.circle(self.screen, color, (isx, isy), 6)
 
     def _draw_bullets(self, game, camera):
+        ricochet_glow = self.sprite_cache.get("ricochet_glow")
         for bullet in game.bullets:
             sx, sy = game.arena.world_to_screen(bullet.position, camera)
             isx, isy = int(sx), int(sy)
@@ -436,16 +600,16 @@ class Renderer:
             if bullet.weapon_type == entities.WeaponType.ROCKET:
                 surface = self.sprite_cache.get("rocket")
                 if surface:
-                    angle = bullet.weapon_type.value
                     self.screen.blit(surface, (isx - surface.get_width() // 2,
                                                isy - surface.get_height() // 2))
                 else:
                     self.pygame.draw.circle(self.screen, constants.COLOR_ORANGE, (isx, isy), 4)
             elif bullet.weapon_type == entities.WeaponType.RICOCHET:
-                glow = self.pygame.Surface((16, 16), self.pygame.SRCALPHA)
-                self.pygame.draw.circle(glow, (180, 80, 220, 80), (8, 8), 6)
-                self.pygame.draw.circle(glow, (220, 150, 255), (8, 8), 3)
-                self.screen.blit(glow, (isx - 8, isy - 8))
+                # Use pre-cached glow surface
+                if ricochet_glow:
+                    self.screen.blit(ricochet_glow, (isx - 8, isy - 8))
+                else:
+                    self.pygame.draw.circle(self.screen, (220, 150, 255), (isx, isy), 3)
             else:
                 surface = self.sprite_cache.get("bullet")
                 if surface:
@@ -471,59 +635,31 @@ class Renderer:
             self._draw_tank_fallback(game, tank, camera,
                                      constants.COLOR_GREEN if color_key == "green" else constants.COLOR_RED)
             return
+        # Draw body (pre-cached surface, rotated)
         body_angle = tank.body_angle
         body_rotated = self.pygame.transform.rotate(cached, -body_angle)
         body_rect = body_rotated.get_rect(center=(isx, isy))
         self.screen.blit(body_rotated, body_rect)
-        turret_angle = tank.turret_angle
-        turret_surface = self._create_turret_surface(tank, color_key)
-        turret_rotated = self.pygame.transform.rotate(turret_surface, -turret_angle)
-        turret_rect = turret_rotated.get_rect(center=(isx, isy))
-        self.screen.blit(turret_rotated, turret_rect)
+        # Draw turret (pre-cached surface, rotated)
+        turret_surface = self.sprite_cache.get(f"turret_{color_key}")
+        if turret_surface:
+            turret_angle = tank.turret_angle
+            turret_rotated = self.pygame.transform.rotate(turret_surface, -turret_angle)
+            turret_rect = turret_rotated.get_rect(center=(isx, isy))
+            self.screen.blit(turret_rotated, turret_rect)
+        # Draw hit flash (pre-cached surface with alpha modulation)
         if tank.hit_flash_timer > 0:
-            flash_intensity = tank.hit_flash_timer / constants.TANK_HIT_FLASH_TIME
-            flash_alpha = int(120 * flash_intensity)
-            flash_surf = self.pygame.Surface(
-                (constants.TANK_HITBOX_RADIUS * 2 + 8,
-                 constants.TANK_HITBOX_RADIUS * 2 + 8),
-                self.pygame.SRCALPHA,
-            )
-            self.pygame.draw.circle(
-                flash_surf, (255, 255, 255, flash_alpha),
-                (int(constants.TANK_HITBOX_RADIUS + 4), int(constants.TANK_HITBOX_RADIUS + 4)),
-                int(constants.TANK_HITBOX_RADIUS + 2),
-            )
-            self.screen.blit(flash_surf,
-                             (isx - constants.TANK_HITBOX_RADIUS - 4,
-                              isy - constants.TANK_HITBOX_RADIUS - 4))
-
-    def _create_turret_surface(self, tank, color_key):
-        base_color = constants.COLOR_GREEN if color_key == "green" else constants.COLOR_RED
-        dark_color = tuple(max(0, c - 50) for c in base_color)
-        mid_color = tuple(max(0, c - 25) for c in base_color)
-        light_color = tuple(min(255, c + 40) for c in base_color)
-        size = 48
-        surface = self.pygame.Surface((size, size), self.pygame.SRCALPHA)
-        cx, cy = size // 2, size // 2
-        turret_w = constants.TANK_TURRET_WIDTH
-        turret_h = constants.TANK_BODY_HEIGHT
-        barrel_rect = (cx - turret_w // 2, cy - turret_h // 2, turret_w, turret_h)
-        self.pygame.draw.rect(surface, base_color, barrel_rect, border_radius=2)
-        self.pygame.draw.rect(surface, dark_color, barrel_rect, 1, border_radius=2)
-        self.pygame.draw.line(surface, light_color,
-                              (barrel_rect[0] + 2, barrel_rect[1] + 1),
-                              (barrel_rect[0] + barrel_rect[2] - 2, barrel_rect[1] + 1), 1)
-        muzzle_w = turret_w + 4
-        muzzle_h = 5
-        muzzle_rect = (cx - muzzle_w // 2, cy - turret_h // 2 - muzzle_h, muzzle_w, muzzle_h)
-        self.pygame.draw.rect(surface, dark_color, muzzle_rect, border_radius=1)
-        self.pygame.draw.rect(surface, mid_color,
-                              (cx - turret_w // 2 - 1, cy - 6, turret_w + 2, 12),
-                              border_radius=3)
-        self.pygame.draw.rect(surface, dark_color,
-                              (cx - turret_w // 2 - 1, cy - 6, turret_w + 2, 12),
-                              1, border_radius=3)
-        return surface
+            flash_surface = self.sprite_cache.get("hit_flash")
+            flash_radius = self.sprite_cache.get("hit_flash_radius")
+            if flash_surface and flash_radius:
+                flash_intensity = tank.hit_flash_timer / constants.TANK_HIT_FLASH_TIME
+                # Scale alpha by modulating a copy — this is cheaper than
+                # creating a new surface from scratch every frame.
+                alpha = int(120 * flash_intensity)
+                temp = flash_surface.copy()
+                temp.set_alpha(alpha)
+                self.screen.blit(temp,
+                                 (isx - flash_radius, isy - flash_radius))
 
     def _draw_tank_fallback(self, game, tank, camera, color):
         screen_pos = game.arena.world_to_screen(tank.position, camera)
@@ -542,12 +678,11 @@ class Renderer:
     def _draw_destroyed_tank(self, game, tank, camera):
         sx, sy = game.arena.world_to_screen(tank.position, camera)
         isx, isy = int(sx), int(sy)
-        hull = self.pygame.Surface((32, 32), self.pygame.SRCALPHA)
-        self.pygame.draw.polygon(hull, (60, 60, 60, 180),
-                                 [(16, 4), (4, 16), (10, 28), (22, 28), (28, 16)])
-        self.pygame.draw.polygon(hull, (40, 40, 40, 150),
-                                 [(16, 4), (4, 16), (10, 28), (22, 28), (28, 16)], 2)
-        self.screen.blit(hull, (isx - 16, isy - 16))
+        hull = self.sprite_cache.get("destroyed_hull")
+        if hull:
+            self.screen.blit(hull, (isx - 16, isy - 16))
+        else:
+            self.pygame.draw.circle(self.screen, (60, 60, 60), (isx, isy), 12)
         if random.random() < 0.1:
             self.particles.emit_smoke(tank.x, tank.y, 1)
 
