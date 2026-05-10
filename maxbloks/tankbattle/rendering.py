@@ -778,15 +778,21 @@ class Renderer:
                                                         constants.SCREEN_HEIGHT - 20)))
 
     # ------------------------------------------------------------------
-    # Lobby drawing — enhanced with network info and client list
+    # Lobby drawing — enhanced with network info, symmetric visibility,
+    # and bidirectional handshake indicators
     # ------------------------------------------------------------------
 
     def draw_lobby(self, game):
         """Draw the enhanced lobby screen with network information.
 
         Displays the host's IP address, WiFi network name, a list of
-        discovered clients with connection status indicators, and the
-        lobby action menu.  Inspired by the networktest app's UI.
+        discovered peers with connection/handshake status indicators,
+        and the lobby action menu.  Both Host and Join lobbies now
+        show each other symmetrically.
+
+        Issue 1: Handshake-confirmed connections show a ✓ indicator.
+        Issue 2: Join lobby shows available hosts with ability to
+                 select one; Host lobby shows clients with join status.
         """
         sw = constants.SCREEN_WIDTH
         sh = constants.SCREEN_HEIGHT
@@ -841,7 +847,7 @@ class Renderer:
                               (margin, y), (sw - margin, y), 1)
         y += 8
 
-        # Discovered clients / peers section
+        # Discovered clients / hosts section
         header_label = "Discovered Clients:" if game.lobby_is_host else "Available Hosts:"
         header_surf = self.font_lobby.render(header_label, True, self._LOB_COLOR_TEXT)
         self.screen.blit(header_surf, (margin + 8, y))
@@ -849,32 +855,82 @@ class Renderer:
 
         discovered = game.lobby_discovered_clients
         connected = game.lobby_connected_clients
+        handshake_confirmed = game.lobby_handshake_confirmed
 
-        if not discovered:
+        # Filter peers based on role for display
+        if game.lobby_is_host:
+            # Host sees all discovered peers (both hosts and clients)
+            display_peers = discovered
+        else:
+            # Join lobby only shows hosts (peers with hosting=True)
+            display_peers = [h for h in discovered if h.get("hosting")]
+
+        if not display_peers:
             searching_text = "Searching for devices..." if game.lobby_is_host else "Searching for hosts..."
             search_surf = self.font_small.render(searching_text, True, self._LOB_COLOR_DIM)
             self.screen.blit(search_surf, (margin + 24, y))
             y += row_h
         else:
-            for host_info in discovered:
+            for peer_idx, host_info in enumerate(display_peers):
                 ip = host_info.get("address", "???")
                 is_connected = ip in connected
+                is_handshake = handshake_confirmed.get(ip, False)
 
-                # Connection status dot
-                dot_color = self._LOB_COLOR_SUCCESS if is_connected else self._LOB_COLOR_DIM
-                dot_x = margin + 24
-                dot_y_c = y + row_h // 2
-                self.pygame.draw.circle(self.screen, dot_color, (dot_x, dot_y_c), 5)
+                # Connection status dot with handshake indicator
+                if is_handshake:
+                    # Issue 1: Bidirectional handshake confirmed — green with ✓
+                    dot_color = self._LOB_COLOR_SUCCESS
+                    dot_x = margin + 24
+                    dot_y_c = y + row_h // 2
+                    self.pygame.draw.circle(self.screen, dot_color, (dot_x, dot_y_c), 5)
+                    # Draw checkmark inside the dot
+                    self.pygame.draw.line(self.screen, constants.COLOR_BLACK,
+                                          (dot_x - 2, dot_y_c), (dot_x - 1, dot_y_c + 2), 2)
+                    self.pygame.draw.line(self.screen, constants.COLOR_BLACK,
+                                          (dot_x - 1, dot_y_c + 2), (dot_x + 3, dot_y_c - 3), 2)
+                elif is_connected:
+                    # Connected but handshake not yet confirmed — yellow
+                    dot_color = self._LOB_COLOR_WARNING
+                    dot_x = margin + 24
+                    dot_y_c = y + row_h // 2
+                    self.pygame.draw.circle(self.screen, dot_color, (dot_x, dot_y_c), 5)
+                else:
+                    # Discovered but not connected — dim
+                    dot_color = self._LOB_COLOR_DIM
+                    dot_x = margin + 24
+                    dot_y_c = y + row_h // 2
+                    self.pygame.draw.circle(self.screen, dot_color, (dot_x, dot_y_c), 5)
 
                 # IP address
                 ip_surf = self.font_small.render(ip, True, self._LOB_COLOR_TEXT)
                 self.screen.blit(ip_surf, (margin + 40, y))
 
-                # Connection status text
-                status = "CONNECTED" if is_connected else "available"
-                status_color = self._LOB_COLOR_SUCCESS if is_connected else self._LOB_COLOR_DIM
+                # Connection status text (Issue 1 & 2)
+                if is_handshake:
+                    status = "Connected \u2713"
+                    status_color = self._LOB_COLOR_SUCCESS
+                elif is_connected:
+                    status = "Handshaking..."
+                    status_color = self._LOB_COLOR_WARNING
+                else:
+                    status = "available"
+                    status_color = self._LOB_COLOR_DIM
                 status_surf = self.font_small.render(status, True, status_color)
                 self.screen.blit(status_surf, (sw - margin - status_surf.get_width() - 8, y))
+
+                # In the Join lobby, show selection highlight for the
+                # currently highlighted host (Issue 2)
+                if not game.lobby_is_host and peer_idx == game.lobby_index:
+                    highlight_rect = (margin + 4, y - 2, sw - 2 * margin - 8, row_h)
+                    self.pygame.draw.rect(self.screen, (40, 80, 50), highlight_rect, border_radius=3)
+                    self.pygame.draw.rect(self.screen, constants.COLOR_GREEN, highlight_rect, 2, border_radius=3)
+                    # Arrow indicator
+                    arrow_x = margin + 8
+                    arrow_y_c = y + row_h // 2
+                    self.pygame.draw.polygon(self.screen, constants.COLOR_YELLOW,
+                                             [(arrow_x, arrow_y_c - 4),
+                                              (arrow_x + 6, arrow_y_c),
+                                              (arrow_x, arrow_y_c + 4)])
 
                 y += row_h
 
@@ -884,31 +940,62 @@ class Renderer:
                               (margin, y), (sw - margin, y), 1)
         y += 10
 
-        # Lobby action menu (Start / Manual IP / Back)
-        for idx, item in enumerate(constants.LOBBY_ITEMS):
-            item_y = y + idx * 38
-            if idx == game.lobby_index:
-                # Selection highlight
-                highlight_rect = (margin + 4, item_y - 6, sw - 2 * margin - 8, 32)
-                self.pygame.draw.rect(self.screen, (40, 60, 45), highlight_rect, border_radius=5)
-                self.pygame.draw.rect(self.screen, constants.COLOR_GREEN, highlight_rect, 2, border_radius=5)
+        # Lobby action menu
+        if game.lobby_is_host:
+            # Host lobby: standard action menu (Start / Manual IP / Back)
+            for idx, item in enumerate(constants.LOBBY_ITEMS):
+                item_y = y + idx * 38
+                if idx == game.lobby_index:
+                    # Selection highlight
+                    highlight_rect = (margin + 4, item_y - 6, sw - 2 * margin - 8, 32)
+                    self.pygame.draw.rect(self.screen, (40, 60, 45), highlight_rect, border_radius=5)
+                    self.pygame.draw.rect(self.screen, constants.COLOR_GREEN, highlight_rect, 2, border_radius=5)
 
-                # Arrow indicator
-                arrow_x = margin + 12
-                self.pygame.draw.polygon(self.screen, constants.COLOR_YELLOW,
-                                         [(arrow_x, item_y - 4),
-                                          (arrow_x + 8, item_y + 8),
-                                          (arrow_x, item_y + 20)])
+                    # Arrow indicator
+                    arrow_x = margin + 12
+                    self.pygame.draw.polygon(self.screen, constants.COLOR_YELLOW,
+                                             [(arrow_x, item_y - 4),
+                                              (arrow_x + 8, item_y + 8),
+                                              (arrow_x, item_y + 20)])
 
-                color = constants.COLOR_YELLOW
-            else:
-                color = self._LOB_COLOR_DIM
+                    color = constants.COLOR_YELLOW
+                else:
+                    color = self._LOB_COLOR_DIM
 
-            item_surf = self.font_lobby.render(item, True, color)
-            self.screen.blit(item_surf, item_surf.get_rect(center=(sw // 2, item_y + 10)))
+                item_surf = self.font_lobby.render(item, True, color)
+                self.screen.blit(item_surf, item_surf.get_rect(center=(sw // 2, item_y + 10)))
+        else:
+            # Join lobby: action menu items are offset by the number of hosts
+            hosts = [h for h in discovered if h.get("hosting")]
+            num_hosts = len(hosts)
+            for idx, item in enumerate(constants.LOBBY_ITEMS):
+                item_index = num_hosts + idx
+                item_y = y + idx * 38
+                if item_index == game.lobby_index:
+                    # Selection highlight
+                    highlight_rect = (margin + 4, item_y - 6, sw - 2 * margin - 8, 32)
+                    self.pygame.draw.rect(self.screen, (40, 60, 45), highlight_rect, border_radius=5)
+                    self.pygame.draw.rect(self.screen, constants.COLOR_GREEN, highlight_rect, 2, border_radius=5)
+
+                    # Arrow indicator
+                    arrow_x = margin + 12
+                    self.pygame.draw.polygon(self.screen, constants.COLOR_YELLOW,
+                                             [(arrow_x, item_y - 4),
+                                              (arrow_x + 8, item_y + 8),
+                                              (arrow_x, item_y + 20)])
+
+                    color = constants.COLOR_YELLOW
+                else:
+                    color = self._LOB_COLOR_DIM
+
+                item_surf = self.font_lobby.render(item, True, color)
+                self.screen.blit(item_surf, item_surf.get_rect(center=(sw // 2, item_y + 10)))
 
         # Bottom instructions
-        instructions = "D-pad/Arrows: Navigate  |  A/Enter: Select  |  B/ESC: Back  |  Btn 8/13: Quit"
+        if game.lobby_is_host:
+            instructions = "D-pad/Arrows: Navigate  |  A/Enter: Select  |  B/ESC: Back"
+        else:
+            instructions = "D-pad: Select Host  |  A/Enter: Join  |  B/ESC: Back"
         inst_surf = self.font_small.render(instructions, True, self._LOB_COLOR_DIM)
         self.screen.blit(inst_surf, inst_surf.get_rect(center=(sw // 2, sh - 16)))
 

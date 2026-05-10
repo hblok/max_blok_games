@@ -26,6 +26,9 @@ class Hud:
         self._draw_round_pips(screen, game.round_wins)
         self._draw_timer(screen, game)
         self._draw_minimap(screen, game)
+        # Issue 3: In-game connection status widget
+        if not game.single_player:
+            self._draw_connection_status(screen, game)
 
     def _draw_hp(self, screen, tank):
         bg_width = constants.TANK_MAX_HP * (constants.HUD_HP_SEGMENT_WIDTH + constants.HUD_HP_SEGMENT_GAP) + 8
@@ -202,3 +205,99 @@ class Hud:
         self.pygame.draw.circle(self.minimap_surface, color, (x_value, y_value), 3)
         outline_color = tuple(min(255, c + 80) for c in color)
         self.pygame.draw.circle(self.minimap_surface, outline_color, (x_value, y_value), 3, 1)
+
+    # ------------------------------------------------------------------
+    # Issue 3: In-Game Connection Status Widget
+    # ------------------------------------------------------------------
+
+    def _draw_connection_status(self, screen, game):
+        """Draw a signal-strength bar indicator in the top-right corner.
+
+        Shows connection quality as 1–4 filled bars:
+          - 4 bars (green):  quality >= 0.8 (Good)
+          - 3 bars (yellow): quality >= 0.6 (OK)
+          - 2 bars (orange): quality >= 0.4 (Poor)
+          - 1 bar  (red):    quality >  0.0 (Weak)
+          - 0 bars (grey):   quality == 0.0 or not connected
+
+        A small label beneath the bars shows the status text.
+        The widget is only drawn during multiplayer games.
+        """
+        monitor = game.net.monitor
+        quality = monitor.quality
+        is_connected = monitor.is_connected
+
+        x = constants.HUD_CONN_X
+        y = constants.HUD_CONN_Y
+        bar_w = constants.HUD_CONN_BAR_WIDTH
+        bar_h_max = constants.HUD_CONN_BAR_HEIGHT
+        gap = constants.HUD_CONN_BAR_GAP
+        num_bars = constants.HUD_CONN_NUM_BARS
+
+        # Background panel
+        panel_w = num_bars * (bar_w + gap) + 12
+        panel_h = bar_h_max + 24
+        bg_surf = self.pygame.Surface((panel_w, panel_h), self.pygame.SRCALPHA)
+        self.pygame.draw.rect(bg_surf, (0, 0, 0, 120),
+                              (0, 0, panel_w, panel_h), border_radius=4)
+        self.pygame.draw.rect(bg_surf, (255, 255, 255, 40),
+                              (0, 0, panel_w, panel_h), 1, border_radius=4)
+        screen.blit(bg_surf, (x - 6, y - 4))
+
+        # Determine how many bars to fill and the color
+        if not is_connected:
+            filled_bars = 0
+            bar_color = constants.COLOR_GREY
+            status_text = "DC"
+        elif quality >= constants.CONNECTION_QUALITY_GOOD:
+            filled_bars = 4
+            bar_color = constants.COLOR_GREEN
+            status_text = "OK"
+        elif quality >= 0.6:
+            filled_bars = 3
+            bar_color = constants.COLOR_YELLOW
+            status_text = "OK"
+        elif quality >= constants.CONNECTION_QUALITY_POOR:
+            filled_bars = 2
+            bar_color = constants.COLOR_ORANGE
+            status_text = "LOW"
+        elif quality > 0.0:
+            filled_bars = 1
+            bar_color = constants.COLOR_RED
+            status_text = "LOW"
+        else:
+            filled_bars = 0
+            bar_color = constants.COLOR_GREY
+            status_text = "DC"
+
+        # Draw the signal bars (shortest on left, tallest on right)
+        for i in range(num_bars):
+            bar_index = i + 1  # 1-based
+            # Each bar has a height proportional to its index
+            h = int(bar_h_max * bar_index / num_bars)
+            bar_x = x + i * (bar_w + gap)
+            bar_y = y + bar_h_max - h  # bottom-aligned
+
+            if bar_index <= filled_bars:
+                # Filled bar
+                self.pygame.draw.rect(screen, bar_color,
+                                      (bar_x, bar_y, bar_w, h), border_radius=1)
+                # Subtle highlight on top edge
+                highlight = tuple(min(255, c + 60) for c in bar_color)
+                self.pygame.draw.line(screen, highlight,
+                                      (bar_x + 1, bar_y + 1),
+                                      (bar_x + bar_w - 2, bar_y + 1), 1)
+            else:
+                # Empty bar outline
+                self.pygame.draw.rect(screen, (60, 60, 60),
+                                      (bar_x, bar_y, bar_w, h), border_radius=1)
+                self.pygame.draw.rect(screen, (80, 80, 80),
+                                      (bar_x, bar_y, bar_w, h), 1, border_radius=1)
+
+        # Status label below the bars
+        label_color = bar_color
+        label_surf = self.small_font.render(status_text, True, label_color)
+        label_rect = label_surf.get_rect(
+            center=(x + (num_bars * (bar_w + gap) - gap) // 2, y + bar_h_max + 10)
+        )
+        screen.blit(label_surf, label_rect)
