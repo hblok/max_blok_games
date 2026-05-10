@@ -1,7 +1,14 @@
 # Copyright (C) 2026 H. Blok
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""TankBattle game state machine and main loop."""
+"""TankBattle game state machine and main loop.
+
+Enhanced with:
+  - Bidirectional welcome handshake verification in lobby
+  - Symmetric peer discovery (both host and client see each other)
+  - Client can select and join a specific host from the lobby
+  - In-game connection status tracking via ConnectionMonitor
+"""
 
 import enum
 import random
@@ -107,11 +114,15 @@ class TankBattleGame:
         # Lobby state
         self.lobby_index = 0
         self.lobby_is_host = False
-        self.lobby_discovered_clients = []  # list of {"address": ip, "port": port}
+        self.lobby_discovered_clients = []  # list of {"address": ip, "port": port, "hosting": bool}
         self.lobby_connected_clients = []   # list of IP strings
         self.lobby_client_last_seen = {}    # ip -> timestamp
         self.lobby_local_ip = "0.0.0.0"
         self.lobby_wifi_ssid = None
+        # Track handshake-verified connections: ip -> bool
+        self.lobby_handshake_confirmed = {}
+        # Selected host index for join lobby navigation
+        self.lobby_host_select_index = 0
 
     @property
     def local_tank(self):
@@ -217,9 +228,11 @@ class TankBattleGame:
         """Transition from MENU to LOBBY, starting discovery."""
         self.lobby_is_host = is_host
         self.lobby_index = 0
+        self.lobby_host_select_index = 0
         self.lobby_discovered_clients.clear()
         self.lobby_connected_clients.clear()
         self.lobby_client_last_seen.clear()
+        self.lobby_handshake_confirmed.clear()
         self.lobby_local_ip = self.net.local_ip
         self.lobby_wifi_ssid = _get_wifi_ssid()
         if is_host:
@@ -232,29 +245,74 @@ class TankBattleGame:
     # ------------------------------------------------------------------
 
     def handle_input_lobby(self, input_state):
-        # Navigation within lobby items (Start / Manual IP / Back)
-        if input_state.menu_up_just_pressed:
-            self.lobby_index = (self.lobby_index - 1) % len(constants.LOBBY_ITEMS)
-        if input_state.menu_down_just_pressed:
-            self.lobby_index = (self.lobby_index + 1) % len(constants.LOBBY_ITEMS)
-        if input_state.menu_y != 0:
-            self.lobby_index = (self.lobby_index + input_state.menu_y) % len(constants.LOBBY_ITEMS)
+        if self.lobby_is_host:
+            # Host lobby: navigate lobby action menu
+            if input_state.menu_up_just_pressed:
+                self.lobby_index = (self.lobby_index - 1) % len(constants.LOBBY_ITEMS)
+            if input_state.menu_down_just_pressed:
+                self.lobby_index = (self.lobby_index + 1) % len(constants.LOBBY_ITEMS)
+            if input_state.menu_y != 0:
+                self.lobby_index = (self.lobby_index + input_state.menu_y) % len(constants.LOBBY_ITEMS)
+        else:
+            # Join lobby: navigate between host list and action menu
+            hosts = [h for h in self.lobby_discovered_clients if h.get("hosting")]
+            total_items = len(hosts) + len(constants.LOBBY_ITEMS)
+            if input_state.menu_up_just_pressed:
+                self.lobby_index = (self.lobby_index - 1) % max(1, total_items)
+            if input_state.menu_down_just_pressed:
+                self.lobby_index = (self.lobby_index + 1) % max(1, total_items)
+            if input_state.menu_y != 0:
+                self.lobby_index = (self.lobby_index + input_state.menu_y) % max(1, total_items)
 
         if input_state.pause_just_pressed:
             self.net.stop_discovery()
             self.state = GameState.MENU
         if input_state.confirm_just_pressed:
-            if self.lobby_index == 0:  # Start
-                self.net.stop_discovery()
-                self.start_match()
-            elif self.lobby_index == 1:  # Manual IP — future work
-                pass
-            else:  # Back
-                self.net.stop_discovery()
-                self.state = GameState.MENU
+            if self.lobby_is_host:
+                # Host action menu
+                if self.lobby_index == 0:  # Start
+                    self.net.stop_discovery()
+                    self.start_match()
+                elif self.lobby_index == 1:  # Manual IP — future work
+                    pass
+                else:  # Back
+                    self.net.stop_discovery()
+                    self.state = GameState.MENU
+            else:
+                # Join lobby: check if a host is selected or an action item
+                hosts = [h for h in self.lobby_discovered_clients if h.get("hosting")]
+                num_hosts = len(hosts)
+                if self.lobby_index < num_hosts and num_hosts > 0:
+                    # A host was selected — connect to it
+                    selected_host = hosts[self.lobby_index]
+                    host_ip = selected_host["address"]
+                    host_port = selected_host.get("port", constants.HOST_PORT)
+                    self._connect_to_selected_host(host_ip, host_port)
+                else:
+                    # Action menu items (offset by number of hosts)
+                    action_index = self.lobby_index - num_hosts
+                    if action_index == 0:  # Manual IP — future work
+                        pass
+                    elif action_index == 1:  # Back
+                        self.net.stop_discovery()
+                        self.state = GameState.MENU
+
+    def _connect_to_selected_host(self, host_ip, host_port):
+        """Attempt to connect to a selected host from the join lobby."""
+        try:
+            self.net.connect_to_host(host_ip, host_port)
+            self.lobby_connected_clients.append(host_ip)
+            self.lobby_handshake_confirmed[host_ip] = True
+        except Exception as e:
+            print(f"TankBattle connect error: {e}")
+
+    # ------------------------------------------------------------------
+    # Lobby update
+    # ------------------------------------------------------------------
 
     def update_lobby(self, dt):
-        """Refresh lobby discovery data and accept host connections."""
+        """Refresh lobby discovery data, accept host connections, and
+        process welcome handshake messages."""
         now = time.monotonic()
 
         # Prune stale discovered peers (timeout > 10 s)
@@ -264,9 +322,17 @@ class TankBattleGame:
         ]
         for ip in stale:
             del self.lobby_client_last_seen[ip]
+            # Also remove from handshake confirmed if stale
+            self.lobby_handshake_confirmed.pop(ip, None)
 
-        # Refresh discovered client list from NetworkManager
+        # Refresh discovered peer list from NetworkManager
         self.lobby_discovered_clients = list(self.net.discovered_hosts)
+
+        # Track discovery timestamps for all discovered peers
+        for host_info in self.lobby_discovered_clients:
+            ip = host_info.get("address", "")
+            if ip:
+                self.lobby_client_last_seen[ip] = now
 
         # If host, try to accept a TCP connection
         if self.lobby_is_host and self.net.tcp_socket is not None:
@@ -284,6 +350,8 @@ class TankBattleGame:
                         peer_ip = addr[0]
                         if peer_ip not in self.lobby_connected_clients:
                             self.lobby_connected_clients.append(peer_ip)
+                        # Send welcome handshake to the newly connected client
+                        self.net._send_welcome()
                 except BlockingIOError:
                     # No data yet, keep connection for next frame
                     conn.setblocking(True)
@@ -298,6 +366,8 @@ class TankBattleGame:
                             peer_ip = addr[0]
                             if peer_ip not in self.lobby_connected_clients:
                                 self.lobby_connected_clients.append(peer_ip)
+                            # Send welcome handshake to the newly connected client
+                            self.net._send_welcome()
                     except Exception:
                         pass
             except BlockingIOError:
@@ -305,11 +375,17 @@ class TankBattleGame:
             except Exception:
                 pass
 
-        # Track discovery timestamps for discovered clients
-        for host_info in self.lobby_discovered_clients:
-            ip = host_info.get("address", "")
-            if ip and ip not in self.lobby_client_last_seen:
-                self.lobby_client_last_seen[ip] = now
+        # Process TCP messages (welcome handshake, reliable events)
+        events = self.net.process_tcp_messages()
+        for event_name, payload in events:
+            # Handle reliable game events if needed
+            pass
+
+        # Update handshake confirmation status based on connection monitor
+        if self.net.monitor.connected:
+            remote_ip = self.net.remote_address[0] if self.net.remote_address else None
+            if remote_ip and remote_ip not in self.lobby_handshake_confirmed:
+                self.lobby_handshake_confirmed[remote_ip] = True
 
     # ------------------------------------------------------------------
     # Other states
@@ -399,6 +475,12 @@ class TankBattleGame:
         self._update_powerups(dt)
         self._check_round_end()
         self._send_network_update()
+        # Issue 3: Send pings and receive pong for connection monitoring
+        if not self.single_player:
+            self.net.send_ping_if_due()
+            self.net.receive_udp_pings()
+            # Process any TCP messages during gameplay too
+            self.net.process_tcp_messages()
 
     def update_paused(self, dt):
         pass
