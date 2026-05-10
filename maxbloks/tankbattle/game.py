@@ -59,16 +59,19 @@ class TankBattleGame:
     """Two-player top-down tank battle."""
 
     def __init__(self):
+        print("TankBattleGame.__init__")
         screen, info = compat_sdl.init_display(
             size=(constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT),
             fullscreen=constants.FULLSCREEN,
             vsync=constants.VSYNC,
         )
+        print("pygame.init")
         pygame.init()
 
-        pygame.joystick.init()
-        pygame.font.init()
+        #pygame.joystick.init()
+        #pygame.font.init()
 
+        print("pygame.event.get")
         pygame.event.get()        
         
         self.screen = screen
