@@ -25,6 +25,74 @@ class Arena:
         self.soft_tiles = set()
         self._generate()
 
+    # ------------------------------------------------------------------
+    # Serialisation – host sends arena layout to client so both sides
+    # play on the identical map.
+    # ------------------------------------------------------------------
+
+    def serialize(self):
+        """Return a JSON-serialisable dict describing the arena layout.
+
+        Only the seed and a compact list of obstacles are sent; the
+        client can reconstruct the full arena from this data.
+        """
+        obstacle_list = []
+        for obs in self.obstacles:
+            obstacle_list.append({
+                "tx": obs.tile_x,
+                "ty": obs.tile_y,
+                "tp": obs.type.value,       # "hard_rock" or "soft"
+                "d": obs.is_destroyed,       # destroyed state
+            })
+        data = {
+            "seed": self.seed,
+            "obstacles": obstacle_list,
+        }
+        logger.info(
+            "Arena serialised: seed=%d, %d obstacles",
+            self.seed, len(obstacle_list),
+        )
+        return data
+
+    @classmethod
+    def deserialize(cls, data):
+        """Reconstruct an Arena from a serialised dict.
+
+        This replaces the normal _generate() path – the obstacle
+        list is loaded directly so the client's map is byte-for-byte
+        identical to the host's.
+        """
+        seed = data["seed"]
+        arena_obj = cls.__new__(cls)
+        arena_obj.seed = seed
+        arena_obj.random = random.Random(seed)
+        arena_obj.obstacles = []
+        arena_obj.obstacle_map = {}
+        arena_obj.hard_tiles = set()
+        arena_obj.soft_tiles = set()
+
+        for entry in data["obstacles"]:
+            tile_x = entry["tx"]
+            tile_y = entry["ty"]
+            obs_type = entities.ObstacleType(entry["tp"])
+            destroyed = entry.get("d", False)
+            obs = entities.Obstacle(tile_x, tile_y, obs_type)
+            obs.is_destroyed = destroyed
+            key = (tile_x, tile_y)
+            arena_obj.obstacles.append(obs)
+            arena_obj.obstacle_map[key] = obs
+            if obs_type == entities.ObstacleType.HARD_ROCK:
+                arena_obj.hard_tiles.add(key)
+            else:
+                arena_obj.soft_tiles.add(key)
+
+        logger.info(
+            "Arena deserialised: seed=%d, %d obstacles (%d hard, %d soft)",
+            seed, len(arena_obj.obstacles),
+            len(arena_obj.hard_tiles), len(arena_obj.soft_tiles),
+        )
+        return arena_obj
+
     @property
     def spawn_points(self):
         """Return fixed symmetric spawn points."""

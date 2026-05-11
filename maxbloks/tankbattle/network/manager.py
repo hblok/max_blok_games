@@ -11,6 +11,7 @@ import uuid
 
 from maxbloks.tankbattle import constants
 from maxbloks.tankbattle.network import connection_monitor as _cm
+from maxbloks.tankbattle.network import dead_reckoner as _dr
 from maxbloks.tankbattle.network import discovery as _discovery
 from maxbloks.tankbattle.network import packet as _packet
 
@@ -46,6 +47,10 @@ class NetworkManager:
         self._last_ping_sent = 0.0
         # Buffered TCP data for newline-delimited parsing
         self._tcp_recv_buffer = b""
+        # Dead reckoner for interpolating remote player position
+        self.dead_reckoner = _dr.DeadReckoner()
+        # Last received player update (for game to query)
+        self.last_remote_update = None
 
     def _get_local_ip(self):
         """Get the local IP address of this device."""
@@ -101,6 +106,15 @@ class NetworkManager:
         if self.udp_socket is None:
             self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.udp_socket.setblocking(False)
+            # Bind to the game-data port so we can receive player updates.
+            # The discovery port (5556) is managed by LobbyDiscovery,
+            # so we use a separate port for in-game UDP traffic.
+            try:
+                game_port = constants.GAME_DATA_PORT  # 5557
+                self.udp_socket.bind(("", game_port))
+                logger.info("UDP game-data socket bound to port %d", game_port)
+            except OSError as e:
+                logger.warning("Could not bind UDP game socket to port %d: %s", game_port, e)
 
     # ------------------------------------------------------------------
     # Discovery
@@ -308,8 +322,8 @@ class NetworkManager:
         try:
             data = _packet.PacketCodec.serialize_ping(self._instance_id, now)
             target = self.remote_address
-            # For UDP, use the discovery port
-            self.udp_socket.sendto(data, (target[0], constants.DISCOVERY_PORT))
+            # Send ping to the game data port
+            self.udp_socket.sendto(data, (target[0], constants.GAME_DATA_PORT))
             self._last_ping_sent = now
             self.monitor.mark_ping_sent(now)
         except Exception:
@@ -317,7 +331,11 @@ class NetworkManager:
 
     def receive_udp_pings(self):
         """Check for incoming UDP ping/pong messages and update the
-        connection monitor.  Should be called once per frame."""
+        connection monitor.  Should be called once per frame.
+
+        Note: player-update packets (JSON arrays) are handled by
+        ``receive_player_updates()`` and are silently skipped here.
+        """
         if self.udp_socket is None:
             return
         while True:
@@ -330,7 +348,11 @@ class NetworkManager:
             try:
                 msg = json.loads(data.decode("utf-8"))
             except (json.JSONDecodeError, UnicodeDecodeError):
-                # Might be a player update packet, skip
+                # Not valid JSON – skip
+                continue
+            # Player update packets are JSON arrays; skip them here
+            # (they are handled by receive_player_updates)
+            if isinstance(msg, list):
                 continue
             msg_type = msg.get("type", "")
             if msg_type == constants.PING_PREFIX:
@@ -343,7 +365,7 @@ class NetworkManager:
                     "ts": ts,
                 }, separators=(",", ":")).encode("utf-8")
                 try:
-                    self.udp_socket.sendto(pong, (addr[0], constants.DISCOVERY_PORT))
+                    self.udp_socket.sendto(pong, (addr[0], constants.GAME_DATA_PORT))
                 except Exception:
                     pass
             elif msg_type == "TANKBATTLE_PONG":
@@ -385,6 +407,64 @@ class NetworkManager:
             self.last_update_sent = now
             return True
         return False
+
+    # ------------------------------------------------------------------
+    # UDP player update send / receive
+    # ------------------------------------------------------------------
+
+    def send_player_update(self, packet):
+        """Send a serialized player-update packet to the peer via UDP.
+
+        Uses the host port + 1 so game traffic is separated from
+        discovery pings.
+        """
+        if self.udp_socket is None or self.remote_address is None:
+            return False
+        try:
+            data = _packet.PacketCodec.serialize_player_update(packet)
+            target_ip = self.remote_address[0]
+            target_port = constants.GAME_DATA_PORT  # game data port
+            self.udp_socket.sendto(data, (target_ip, target_port))
+            logger.debug(
+                "Sent player update (player=%d, pos=(%.1f,%.1f)) to %s:%d",
+                packet.player_id, packet.x, packet.y, target_ip, target_port,
+            )
+            return True
+        except Exception as e:
+            logger.error("Failed to send player update: %s", e)
+            return False
+
+    def receive_player_updates(self):
+        """Receive and process incoming UDP player-update packets.
+
+        Should be called once per frame during gameplay.  Returns a
+        list of PlayerUpdatePacket objects received this frame.
+        """
+        updates = []
+        if self.udp_socket is None:
+            return updates
+        while True:
+            try:
+                data, addr = self.udp_socket.recvfrom(constants.MAX_PACKET_SIZE)
+            except BlockingIOError:
+                break
+            except Exception:
+                break
+            # Try to parse as a player update (JSON array)
+            try:
+                packet = _packet.PacketCodec.deserialize_player_update(data)
+                self.dead_reckoner.push_update(packet)
+                self.last_remote_update = packet
+                self.monitor.mark_received()
+                logger.debug(
+                    "Received player update (player=%d, pos=(%.1f,%.1f)) from %s",
+                    packet.player_id, packet.x, packet.y, addr[0],
+                )
+                updates.append(packet)
+            except (ValueError, json.JSONDecodeError, UnicodeDecodeError, IndexError):
+                # Not a player update packet – might be a ping; skip
+                continue
+        return updates
 
     # ------------------------------------------------------------------
     # Cleanup
