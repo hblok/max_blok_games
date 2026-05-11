@@ -58,3 +58,52 @@ py_test(
     deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
     size = "small",
 )
+
+py_test(
+    name = "test_game",
+    srcs = ["test_game.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
+py_test(
+    name = "test_hud",
+    srcs = ["test_hud.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
+py_test(
+    name = "test_input",
+    srcs = ["test_input.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
+py_test(
+    name = "test_network_manager",
+    srcs = ["test_network_manager.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
+py_test(
+    name = "test_rendering_particle_system",
+    srcs = ["test_rendering_particle_system.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
+py_test(
+    name = "test_rendering_renderer",
+    srcs = ["test_rendering_renderer.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
+py_test(
+    name = "test_rendering_sprite_cache",
+    srcs = ["test_rendering_sprite_cache.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
