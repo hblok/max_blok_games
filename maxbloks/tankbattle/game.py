@@ -313,10 +313,13 @@ class TankBattleGame:
         try:
             self.net.connect_to_host(host_ip, host_port)
             self.lobby_connected_clients.append(host_ip)
-            self.lobby_handshake_confirmed[host_ip] = True
-            logger.info("Connected to host %s", host_ip)
+            # NOTE: Do NOT mark handshake_confirmed yet — the welcome-ack
+            # from the host has not been received.  The confirmation will
+            # be set in update_lobby() once the ConnectionMonitor reports
+            # the bidirectional handshake as complete.
+            logger.info("TCP connection to host %s established, awaiting welcome-ack", host_ip)
         except Exception as e:
-            logger.error("Connection to %s failed: %s", host_ip, e)
+            logger.error("Connection to %s failed: %s", host_ip, e, exc_info=True)
 
     # ------------------------------------------------------------------
     # Lobby update
@@ -351,42 +354,28 @@ class TankBattleGame:
         if self.lobby_is_host and self.net.tcp_socket is not None:
             try:
                 conn, addr = self.net.tcp_socket.accept()
-                # Non-blocking read for handshake
+                logger.info("Host: Accepted TCP connection from %s:%d", addr[0], addr[1])
+                # Store the accepted connection immediately so that
+                # process_tcp_messages() can read the welcome handshake
+                # on the next frame.  The client sends TANKBATTLE_WELCOME
+                # (not TANKBATTLE_HELLO), so we must NOT call
+                # parse_handshake() here — that function expects the
+                # legacy HELLO prefix and would silently discard the
+                # connection.
                 conn.setblocking(False)
-                try:
-                    data = conn.recv(4096)
-                    if data:
-                        payload = self.net.parse_handshake(data)
-                        self.net.tcp_socket_client = conn
-                        self.net.remote_address = addr
-                        self.net.connected = True
-                        peer_ip = addr[0]
-                        if peer_ip not in self.lobby_connected_clients:
-                            self.lobby_connected_clients.append(peer_ip)
-                        # Send welcome handshake to the newly connected client
-                        self.net._send_welcome()
-                except BlockingIOError:
-                    # No data yet, keep connection for next frame
-                    conn.setblocking(True)
-                    conn.settimeout(0.001)
-                    try:
-                        data = conn.recv(4096)
-                        if data:
-                            payload = self.net.parse_handshake(data)
-                            self.net.tcp_socket_client = conn
-                            self.net.remote_address = addr
-                            self.net.connected = True
-                            peer_ip = addr[0]
-                            if peer_ip not in self.lobby_connected_clients:
-                                self.lobby_connected_clients.append(peer_ip)
-                            # Send welcome handshake to the newly connected client
-                            self.net._send_welcome()
-                    except Exception:
-                        pass
+                self.net.tcp_socket_client = conn
+                self.net.remote_address = addr
+                peer_ip = addr[0]
+                if peer_ip not in self.lobby_connected_clients:
+                    self.lobby_connected_clients.append(peer_ip)
+                logger.info("Host: Stored client connection %s, waiting for welcome handshake", peer_ip)
+                # Send host welcome handshake immediately; the client's
+                # welcome will be processed by process_tcp_messages().
+                self.net._send_welcome()
             except BlockingIOError:
                 pass
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error("Host: Error accepting connection: %s", e, exc_info=True)
 
         # Process TCP messages (welcome handshake, reliable events)
         events = self.net.process_tcp_messages()
