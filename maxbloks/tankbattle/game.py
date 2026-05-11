@@ -126,6 +126,14 @@ class TankBattleGame:
         self.lobby_handshake_confirmed = {}
         # Selected host index for join lobby navigation
         self.lobby_host_select_index = 0
+        # Network action tracking: these flags are set during input
+        # processing and cleared after the network update is sent
+        self._net_fired = False
+        self._net_fire_angle = 0.0
+        self._net_mine_dropped = False
+        self._net_mine_x = 0.0
+        self._net_mine_y = 0.0
+        self._net_powerup_collected_id = -1
 
     @property
     def local_tank(self):
@@ -283,8 +291,12 @@ class TankBattleGame:
                     self.net.stop_discovery()
                     self.local_player_index = 0
                     self.single_player = False
-                    # Notify the connected client so it can start too
+                    # Send arena data to client before starting match
                     if self.net.tcp_socket_client is not None:
+                        arena_data = self.arena.serialize()
+                        self.net.send_reliable_event("arena_data", arena_data)
+                        logger.info("Host: Sent arena data to client (seed=%d)", arena_data["seed"])
+                        # Then send match_start event
                         self.net.send_reliable_event("match_start")
                         logger.info("Host: Sent match_start event to client")
                     self.start_match()
@@ -386,7 +398,11 @@ class TankBattleGame:
         # Process TCP messages (welcome handshake, reliable events)
         events = self.net.process_tcp_messages()
         for event_name, payload in events:
-            if event_name == "match_start" and not self.lobby_is_host:
+            if event_name == "arena_data" and not self.lobby_is_host:
+                logger.info("Client: Received arena data from host (seed=%d)", payload.get("seed"))
+                # Rebuild arena from host's data so both sides play on identical map
+                self.arena = arena.Arena.deserialize(payload)
+            elif event_name == "match_start" and not self.lobby_is_host:
                 logger.info("Client: Received match_start from host — starting match")
                 self.net.stop_discovery()
                 self.local_player_index = 1
@@ -487,8 +503,10 @@ class TankBattleGame:
         self._update_projectiles(dt)
         self._update_powerups(dt)
         self._check_round_end()
+        # Network: send local state, receive remote state
         self._send_network_update()
-        # Issue 3: Send pings and receive pong for connection monitoring
+        self._receive_network_updates()
+        # Connection monitoring via ping/pong
         if not self.single_player:
             self.net.send_ping_if_due()
             self.net.receive_udp_pings()
@@ -534,7 +552,15 @@ class TankBattleGame:
         for powerup in self.powerups:
             powerup.update(dt)
             for tank in self.tanks:
+                was_alive = powerup.is_alive
                 powerup.collect_if_touching(tank)
+                # Track powerup collection for network update
+                if was_alive and not powerup.is_alive and tank is self.local_tank:
+                    self._net_powerup_collected_id = powerup.identifier
+                    logger.debug(
+                        "Network: tracked powerup collection (id=%d, type=%s)",
+                        powerup.identifier, powerup.type.value,
+                    )
         self.powerups = [powerup for powerup in self.powerups if powerup.is_alive]
 
     def _spawn_powerup(self):
@@ -560,6 +586,11 @@ class TankBattleGame:
             self._add_bullet(tank, tank.turret_angle)
         tank.consume_shot()
         self.renderer.register_muzzle_flash(tank)
+        # Track fired action for network update
+        if tank is self.local_tank:
+            self._net_fired = True
+            self._net_fire_angle = tank.turret_angle
+            logger.debug("Network: tracked fire event at angle %.1f", tank.turret_angle)
 
     def _add_bullet(self, tank, angle, speed=constants.BULLET_SPEED, damage=constants.BULLET_DAMAGE, weapon=entities.WeaponType.PRIMARY, bounces=0):
         dx_value, dy_value = utils.angle_to_vector(angle)
@@ -571,6 +602,12 @@ class TankBattleGame:
         if tank.active_weapon == entities.WeaponType.MINE_LAYER and tank.can_fire():
             self.mines.append(entities.Mine(tank.x, tank.y, tank))
             tank.consume_shot()
+            # Track mine drop for network update
+            if tank is self.local_tank:
+                self._net_mine_dropped = True
+                self._net_mine_x = tank.x
+                self._net_mine_y = tank.y
+                logger.debug("Network: tracked mine drop at (%.1f, %.1f)", tank.x, tank.y)
 
     def _check_round_end(self):
         if self.round_time_remaining <= 0.0 and not self.sudden_death:
@@ -626,8 +663,16 @@ class TankBattleGame:
         self.powerups.clear()
         self.round_time_remaining = constants.ROUND_TIME_LIMIT
         self.sudden_death = False
+        # Clear network action tracking
+        self._net_fired = False
+        self._net_fire_angle = 0.0
+        self._net_mine_dropped = False
+        self._net_mine_x = 0.0
+        self._net_mine_y = 0.0
+        self._net_powerup_collected_id = -1
 
     def _send_network_update(self):
+        """Send local player state to peer via UDP at 20 Hz."""
         if self.single_player:
             return
         now = time.monotonic()
@@ -642,8 +687,63 @@ class TankBattleGame:
             self.local_tank.hp,
             self.local_tank.active_weapon.value,
             self.local_tank.weapon_timer,
+            fired=self._net_fired,
+            fire_angle=self._net_fire_angle,
+            mine_dropped=self._net_mine_dropped,
+            mine_x=self._net_mine_x,
+            mine_y=self._net_mine_y,
+            powerup_collected_id=self._net_powerup_collected_id,
         )
-        network.PacketCodec.serialize_player_update(packet)
+        # Actually send the packet via UDP
+        self.net.send_player_update(packet)
+        # Clear action tracking flags after sending
+        self._net_fired = False
+        self._net_fire_angle = 0.0
+        self._net_mine_dropped = False
+        self._net_mine_x = 0.0
+        self._net_mine_y = 0.0
+        self._net_powerup_collected_id = -1
+
+    def _receive_network_updates(self):
+        """Receive and apply remote player updates from UDP packets."""
+        if self.single_player:
+            return
+        updates = self.net.receive_player_updates()
+        for packet in updates:
+            # Find the remote tank (player_id is 1-indexed)
+            remote_idx = packet.player_id - 1
+            if 0 <= remote_idx < len(self.tanks):
+                remote_tank = self.tanks[remote_idx]
+                # Apply the update to the remote tank
+                remote_tank.x = packet.x
+                remote_tank.y = packet.y
+                remote_tank.body_angle = packet.body_angle
+                remote_tank.turret_angle = packet.turret_angle
+                remote_tank.hp = packet.hp
+                remote_tank.active_weapon = entities.WeaponType(packet.weapon)
+                remote_tank.weapon_timer = packet.weapon_timer
+                # Handle fired bullets
+                if packet.fired:
+                    self._add_bullet(
+                        remote_tank,
+                        packet.fire_angle,
+                        constants.BULLET_SPEED,
+                        constants.BULLET_DAMAGE,
+                        entities.WeaponType.PRIMARY,
+                    )
+                # Handle dropped mines
+                if packet.mine_dropped:
+                    self.mines.append(entities.Mine(packet.mine_x, packet.mine_y, remote_tank))
+                # Handle powerup collection
+                if packet.powerup_collected_id >= 0:
+                    for powerup in self.powerups:
+                        if powerup.identifier == packet.powerup_collected_id:
+                            powerup.is_alive = False
+                            break
+                logger.debug(
+                    "Applied remote update: player=%d, pos=(%.1f,%.1f), hp=%d",
+                    packet.player_id, packet.x, packet.y, packet.hp,
+                )
 
     # ------------------------------------------------------------------
     # Drawing
