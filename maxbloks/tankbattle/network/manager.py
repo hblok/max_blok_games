@@ -139,6 +139,38 @@ class NetworkManager:
             })
 
     # ------------------------------------------------------------------
+    # Reliable event transport (TCP)
+    # ------------------------------------------------------------------
+
+    def send_reliable_event(self, event_name, payload=None):
+        """Send a reliable (TCP) game event to the connected peer.
+
+        Should be used for important state transitions like match-start
+        that must not be lost.  Returns True on success, False on
+        failure.
+        """
+        if payload is None:
+            payload = {}
+        sock = None
+        if self.role == "host" and self.tcp_socket_client is not None:
+            sock = self.tcp_socket_client
+        elif self.role == "client" and self.tcp_socket is not None:
+            sock = self.tcp_socket
+
+        if sock is None:
+            logger.warning("send_reliable_event: no TCP socket (role=%s)", self.role)
+            return False
+
+        try:
+            data = _packet.PacketCodec.serialize_reliable_event(event_name, payload)
+            sock.sendall(data)
+            logger.debug("Sent reliable event '%s' (role=%s)", event_name, self.role)
+            return True
+        except Exception as e:
+            logger.error("Failed to send reliable event '%s': %s", event_name, e)
+            return False
+
+    # ------------------------------------------------------------------
     # Welcome handshake (Issue 1: Bidirectional Connection Verification)
     # ------------------------------------------------------------------
 

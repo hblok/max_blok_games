@@ -174,3 +174,27 @@ class TestNetworkManager(unittest.TestCase):
     def test_send_welcome_with_no_socket_does_not_raise(self):
         self.nm.role = "host"
         self.nm._send_welcome()
+
+    # --- send_reliable_event ---
+
+    def test_send_reliable_event_no_socket_returns_false(self):
+        self.nm.role = "host"
+        result = self.nm.send_reliable_event("match_start")
+        self.assertFalse(result)
+
+    def test_send_reliable_event_host_no_client_returns_false(self):
+        self.nm.start_host(port=0)
+        result = self.nm.send_reliable_event("match_start")
+        self.assertFalse(result)
+
+    def test_send_reliable_event_client_with_socket_returns_true(self):
+        """Start a host and connect a client, then send a reliable event."""
+        host = NetworkManager()
+        host.start_host(port=0)
+        # Get the actual port the host bound to
+        host_port = host.tcp_socket.getsockname()[1]
+        self.nm.role = "client"
+        self.nm.connect_to_host("127.0.0.1", host_port)
+        result = self.nm.send_reliable_event("match_start", {"seed": 42})
+        self.assertTrue(result)
+        host.close()
