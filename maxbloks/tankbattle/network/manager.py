@@ -72,6 +72,7 @@ class NetworkManager:
         self.tcp_socket.listen(1)
         self.tcp_socket.setblocking(False)
         self._ensure_udp_socket()
+        logger.debug("Host TCP listener ready, waiting for connections")
         return True
 
     def connect_to_host(self, host, port=constants.HOST_PORT, timeout=constants.RECONNECT_TIMEOUT):
@@ -80,14 +81,20 @@ class NetworkManager:
         self.role = "client"
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.settimeout(timeout)
-        self.tcp_socket.connect((host, port))
+        try:
+            self.tcp_socket.connect((host, port))
+        except OSError as e:
+            logger.error("TCP connect to %s:%d failed: %s", host, port, e)
+            self.tcp_socket.close()
+            self.tcp_socket = None
+            raise
         self.tcp_socket.setblocking(False)
         self.remote_address = (host, port)
         self.connected = True
         self._ensure_udp_socket()
         # Send welcome handshake immediately after connecting
         self._send_welcome()
-        logger.info("TCP connection established to %s:%d", host, port)
+        logger.info("TCP connection established to %s:%d — welcome handshake sent, awaiting ack", host, port)
         return True
 
     def _ensure_udp_socket(self):
@@ -199,13 +206,19 @@ class NetworkManager:
                 self.monitor.mark_received()
             else:
                 # Connection closed by peer
-                logger.warning("TCP connection closed by peer")
+                logger.warning("TCP connection closed by peer (role=%s)", self.role)
                 self.connected = False
                 self.monitor.connected = False
                 return events
         except BlockingIOError:
             pass
-        except Exception:
+        except ConnectionResetError:
+            logger.warning("TCP connection reset by peer (role=%s)", self.role)
+            self.connected = False
+            self.monitor.connected = False
+            return events
+        except OSError as e:
+            logger.error("TCP recv error (role=%s): %s", self.role, e)
             return events
 
         # Process complete newline-delimited messages
