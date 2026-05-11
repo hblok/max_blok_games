@@ -1,114 +1,93 @@
 #!/usr/bin/env python3
 """Script to identify source modules without unit tests."""
 
-import os
-import json
 from pathlib import Path
 
-WHITE_LIST = [
+WHITELIST = [
     "main",
+    "compat_sdl",
     "version",
 ]
 
+EXCLUDED_GAMES = [
+    "template",
+]
+
+
 def get_source_modules():
-    """Get all Python source modules from directory."""
+    """Get all Python source modules from maxbloks directory."""
     repo_root = Path(__file__).parent.parent
     source_dir = repo_root / "maxbloks"
     modules = []
-    
+
     for py_file in source_dir.rglob("*.py"):
-        # Skip __init__.py files
         if py_file.name == "__init__.py":
             continue
-        
-        # Get relative path from
+
         rel_path = py_file.relative_to(source_dir)
-        # Convert to module notation (e.g., core/application.py -> core.application)
-        module_name = str(rel_path.with_suffix('')).replace('/', '.')
+
+        if "tests" in rel_path.parts:
+            continue
+        if rel_path.parts[0] in EXCLUDED_GAMES:
+            continue
+        if py_file.stem in WHITELIST:
+            continue
+
+        module_name = str(rel_path.with_suffix("")).replace("/", ".")
         modules.append(module_name)
-    
+
     return sorted(modules)
 
-def get_test_modules():
-    """Get all unit test modules from tests/unit directory."""
-    repo_root = Path(__file__).parent.parent
-    test_dir = repo_root / "tests/unit"
-    modules = []
-    
-    for py_file in test_dir.rglob("test_*.py"):
-        rel_path = py_file.relative_to(test_dir)
-        # Convert test filename to potential source module name
-        # test_config_loader.py -> config_loader or config.loader
-        test_name = py_file.stem  # test_config_loader
-        module_part = test_name.replace("test_", "")  # config_loader
-        
-        # Try different conventions: underscore and dot notation
-        potential_modules = [
-            module_part.replace('_', '.'),  # config.loader
-            module_part  # config_loader
-        ]
-        
-        modules.extend(potential_modules)
-    
-    return sorted(set(modules))
 
-def normalize_module_name(module_name):
-    """Normalize module name for comparison (handle underscores and dots)."""
-    # Common patterns
-    normalized = module_name.replace('_', '.')
-    return normalized.lower()
+def get_test_coverage():
+    """Return set of (game, stem_without_test_prefix) pairs for existing tests."""
+    repo_root = Path(__file__).parent.parent
+    source_dir = repo_root / "maxbloks"
+    covered = set()
+
+    for py_file in source_dir.rglob("test_*.py"):
+        rel_parts = py_file.relative_to(source_dir).parts
+        # Only collect from <game>/tests/ directories
+        if len(rel_parts) >= 3 and rel_parts[1] == "tests":
+            game = rel_parts[0]
+            covered.add((game, py_file.stem[5:]))  # strip "test_" prefix
+
+    return covered
+
+
+def test_name_candidates(dotted_module):
+    """Return possible test name stems for a dotted module path.
+
+    For 'tankbattle.network.connection_monitor' returns:
+        ['connection_monitor', 'network_connection_monitor']
+    """
+    parts = dotted_module.split(".")
+    subpath = parts[1:]  # skip game name
+    return ["_".join(subpath[i:]) for i in range(len(subpath))]
+
 
 def find_missing_tests():
     """Find source modules that don't have corresponding tests."""
     source_modules = get_source_modules()
-    test_modules = get_test_modules()
-    
-    # Normalize for comparison
-    normalized_test_modules = [normalize_module_name(m) for m in test_modules]
-    
+    test_coverage = get_test_coverage()
     missing = []
-    
-    for source_module in source_modules:
-        normalized_source = normalize_module_name(source_module)
-        
-        # Check if there's a test module
-        has_test = False
-        for test_normalized in normalized_test_modules:
-            # Check if test module name matches or contains the source module name
-            if test_normalized == normalized_source or \
-               test_normalized.endswith('.' + normalized_source) or \
-               normalized_source.endswith('.' + test_normalized):
-                has_test = True
-                break
-        
-        if not has_test and source_module not in WHITE_LIST:
-            missing.append(source_module)
-    
+
+    for module in source_modules:
+        game = module.split(".")[0]
+        if not any((game, c) in test_coverage for c in test_name_candidates(module)):
+            missing.append(module)
+
     return sorted(missing)
 
+
 def main():
-    """Main function to identify and save missing tests."""
     missing_modules = find_missing_tests()
-    
-    # Create output directory if needed
-    os.makedirs("tests", exist_ok=True)
-    
-    # Save to JSON file
-    #output_file = "tests/missing.json"
-    #with open(output_file, 'w') as f:
-    #    json.dump({
-    #        "missing_tests": missing_modules,
-    #        "count": len(missing_modules),
-    #        "total_source_modules": len(get_source_modules()),
-    #        "tested_modules": len(get_source_modules()) - len(missing_modules)
-    #    }, f, indent=2)
 
     if missing_modules:
         print(f"Found {len(missing_modules)} source modules without tests:")
         for module in missing_modules:
             print(f"  - {module}")
-        
-        #print(f"\nResults saved to {output_file}")
+
 
 if __name__ == "__main__":
     main()
