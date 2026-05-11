@@ -75,12 +75,13 @@ class TankBattleGame:
             fullscreen=constants.FULLSCREEN,
             vsync=constants.VSYNC,
         )
-        logger.debug("pygame.init")
+        logger.debug("TankBattleGame - pygame.init")
         pygame.init()
 
         #pygame.joystick.init()
         #pygame.font.init()
 
+        logger.debug("TankBattleGame - pygame.event.get")        
         pygame.event.get()
         
         self.screen = screen
