@@ -57,3 +57,7 @@ bandit -c bandit.yaml -r maxbloks/
 python tools/increment_version.py <game>
 # e.g. python tools/increment_version.py spellwheels
 ```
+
+### Claude instructions
+- When running tests or logs, always pipe to head -n 20 or use grep to filter for errors. Do not dump full logs.
+
