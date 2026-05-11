@@ -281,6 +281,12 @@ class TankBattleGame:
                 if self.lobby_index == 0:  # Start
                     logger.info("Host starting match from lobby")
                     self.net.stop_discovery()
+                    self.local_player_index = 0
+                    self.single_player = False
+                    # Notify the connected client so it can start too
+                    if self.net.tcp_socket_client is not None:
+                        self.net.send_reliable_event("match_start")
+                        logger.info("Host: Sent match_start event to client")
                     self.start_match()
                 elif self.lobby_index == 1:  # Manual IP — future work
                     pass
@@ -380,8 +386,13 @@ class TankBattleGame:
         # Process TCP messages (welcome handshake, reliable events)
         events = self.net.process_tcp_messages()
         for event_name, payload in events:
-            # Handle reliable game events if needed
-            pass
+            if event_name == "match_start" and not self.lobby_is_host:
+                logger.info("Client: Received match_start from host — starting match")
+                self.net.stop_discovery()
+                self.local_player_index = 1
+                self.single_player = False
+                self.start_match()
+            # Handle other reliable game events if needed
 
         # Update handshake confirmation status based on connection monitor
         if self.net.monitor.connected:
