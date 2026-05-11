@@ -3,8 +3,16 @@
 
 """Entry point for python -m maxbloks.tankbattle.main."""
 
+import logging
+
 from maxbloks.tankbattle import game
 
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 if __name__ == "__main__":
     tankbattle = game.TankBattleGame()

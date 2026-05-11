@@ -3,11 +3,14 @@
 
 """Simple rule-based AI opponent for single-player mode."""
 
+import logging
 import math
 import random
 
 from maxbloks.tankbattle import constants
 from maxbloks.tankbattle import utils
+
+logger = logging.getLogger(__name__)
 
 
 class TankAI:
@@ -51,6 +54,7 @@ class TankAI:
             return
         turret_delta = abs(utils.shortest_angle_delta(ai_tank.turret_angle, target_angle))
         if turret_delta < constants.AI_AIM_TOLERANCE_DEG:
+            logger.debug("AI firing (dist=%.0f, turret_delta=%.1f°)", dist, turret_delta)
             game._fire_weapon(ai_tank)
             self._fire_timer = random.uniform(
                 constants.AI_FIRE_INTERVAL_MIN, constants.AI_FIRE_INTERVAL_MAX

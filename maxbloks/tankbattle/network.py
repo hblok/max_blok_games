@@ -12,6 +12,7 @@ Enhanced with:
 
 import dataclasses
 import json
+import logging
 import socket
 import struct
 import threading
@@ -19,6 +20,8 @@ import time
 import uuid
 
 from maxbloks.tankbattle import constants
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -291,6 +294,7 @@ class LobbyDiscovery:
 
     def start(self):
         """Start broadcast and listener threads."""
+        logger.info("Starting LAN discovery (role=%s, local_ip=%s)", "host" if self.is_host else "client", self.local_ip)
         self.running = True
         self._setup_send_socket()
         if not self._setup_listen_socket():
@@ -324,7 +328,7 @@ class LobbyDiscovery:
         try:
             s.bind(("", constants.DISCOVERY_PORT))
         except Exception as e:
-            print(f"TankBattle discovery bind failed: {e}")
+            logger.error("Discovery socket bind failed on port %d: %s", constants.DISCOVERY_PORT, e)
             return False
         try:
             mreq = struct.pack(
@@ -334,7 +338,7 @@ class LobbyDiscovery:
             )
             s.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         except Exception as e:
-            print(f"TankBattle multicast join failed: {e}")
+            logger.error("Multicast group join failed (%s): %s", constants.DISCOVERY_MULTICAST_GROUP, e)
             return False
         s.settimeout(1.0)
         self._listen_socket = s
@@ -353,16 +357,18 @@ class LobbyDiscovery:
         ).encode("utf-8")
 
     def _broadcast_loop(self):
+        logger.debug("Discovery broadcast loop started")
         while self.running:
             try:
                 data = self._make_message(constants.BEACON_PREFIX)
                 self._send_socket.sendto(data, (constants.DISCOVERY_MULTICAST_GROUP, constants.DISCOVERY_PORT))
             except Exception as e:
                 if self.running:
-                    print(f"TankBattle discovery broadcast error: {e}")
+                    logger.warning("Discovery broadcast error: %s", e)
             time.sleep(constants.DISCOVERY_BROADCAST_INTERVAL)
 
     def _listen_loop(self):
+        logger.debug("Discovery listen loop started")
         while self.running:
             try:
                 data, addr = self._listen_socket.recvfrom(1024)
@@ -370,7 +376,7 @@ class LobbyDiscovery:
                 continue
             except Exception as e:
                 if self.running:
-                    print(f"TankBattle discovery listen error: {e}")
+                    logger.warning("Discovery listen error: %s", e)
                 continue
             try:
                 msg = json.loads(data.decode("utf-8"))
@@ -382,10 +388,12 @@ class LobbyDiscovery:
             # On receiving a beacon, always send a unicast response so
             # the other side knows about us regardless of role.
             if msg_type == constants.BEACON_PREFIX:
+                logger.debug("Received beacon from %s (hosting=%s)", addr[0], msg.get("hosting"))
                 self._send_response(addr[0])
                 # Notify about the peer — both hosts and clients
                 self.on_peer_found(addr[0], msg)
             elif msg_type == constants.BEACON_RESPONSE:
+                logger.debug("Received discovery response from %s (hosting=%s)", addr[0], msg.get("hosting"))
                 # Notify about the peer — both hosts and clients
                 self.on_peer_found(addr[0], msg)
 
@@ -395,10 +403,11 @@ class LobbyDiscovery:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.sendto(data, (target_ip, constants.DISCOVERY_PORT))
         except Exception as e:
-            print(f"TankBattle discovery response error: {e}")
+            logger.warning("Failed to send discovery response to %s: %s", target_ip, e)
 
     def stop(self):
         """Stop threads and close sockets."""
+        logger.info("Stopping LAN discovery")
         self.running = False
         if self._listen_socket is not None:
             try:
@@ -471,6 +480,7 @@ class NetworkManager:
 
     def start_host(self, host="", port=constants.HOST_PORT):
         """Start TCP host socket."""
+        logger.info("Starting host TCP listener on port %d", port)
         self.role = "host"
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -482,6 +492,7 @@ class NetworkManager:
 
     def connect_to_host(self, host, port=constants.HOST_PORT, timeout=constants.RECONNECT_TIMEOUT):
         """Connect client TCP socket to host and send welcome handshake."""
+        logger.info("Connecting to host %s:%d (timeout=%.1fs)", host, port, timeout)
         self.role = "client"
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.settimeout(timeout)
@@ -492,6 +503,7 @@ class NetworkManager:
         self._ensure_udp_socket()
         # Send welcome handshake immediately after connecting
         self._send_welcome()
+        logger.info("TCP connection established to %s:%d", host, port)
         return True
 
     def _ensure_udp_socket(self):
@@ -528,6 +540,7 @@ class NetworkManager:
             h["address"] == ip and h.get("hosting") == hosting
             for h in self.discovered_hosts
         ):
+            logger.info("Discovered peer %s (hosting=%s, port=%d)", ip, hosting, port)
             self.discovered_hosts.append({
                 "address": ip,
                 "port": port,
@@ -554,8 +567,9 @@ class NetworkManager:
             elif self.role == "client" and self.tcp_socket is not None:
                 self.tcp_socket.sendall(msg)
             self.monitor.handshake_sent_time = time.monotonic()
+            logger.debug("Sent welcome handshake (role=%s)", self.role)
         except Exception as e:
-            print(f"TankBattle welcome send error: {e}")
+            logger.error("Failed to send welcome handshake: %s", e)
 
     def _send_welcome_ack(self):
         """Send a TANKBATTLE_WELCOME_ACK message over the TCP connection."""
@@ -572,8 +586,9 @@ class NetworkManager:
                 self.tcp_socket_client.sendall(msg)
             elif self.role == "client" and self.tcp_socket is not None:
                 self.tcp_socket.sendall(msg)
+            logger.debug("Sent welcome-ack (role=%s)", self.role)
         except Exception as e:
-            print(f"TankBattle welcome-ack send error: {e}")
+            logger.error("Failed to send welcome-ack: %s", e)
 
     def process_tcp_messages(self):
         """Read and process buffered TCP messages (welcome, welcome-ack, etc.).
@@ -600,6 +615,7 @@ class NetworkManager:
                 self.monitor.mark_received()
             else:
                 # Connection closed by peer
+                logger.warning("TCP connection closed by peer")
                 self.connected = False
                 self.monitor.connected = False
                 return events
@@ -621,13 +637,18 @@ class NetworkManager:
             prefix = message.get("prefix", "")
             if prefix == constants.WELCOME_PREFIX:
                 # Peer sent us a welcome; reply with welcome-ack
+                logger.debug("Received welcome from peer (role=%s)", message.get("role"))
                 self._send_welcome_ack()
                 if not self.monitor.connected:
                     self.monitor.connected = True
                     self.monitor.handshake_ack_time = time.monotonic()
                     self.monitor.mark_received()
+                    logger.info("Handshake complete — bidirectional connection established")
             elif prefix == constants.WELCOME_ACK_PREFIX:
                 # Peer acknowledged our welcome
+                logger.debug("Received welcome-ack from peer")
+                if not self.monitor.connected:
+                    logger.info("Handshake acknowledged — bidirectional connection established")
                 self.monitor.connected = True
                 self.monitor.handshake_ack_time = time.monotonic()
                 self.monitor.mark_received()
@@ -742,6 +763,7 @@ class NetworkManager:
 
     def close(self):
         """Close open sockets and stop discovery."""
+        logger.info("NetworkManager closing")
         self.stop_discovery()
         for sock in (self.tcp_socket, self.tcp_socket_client, self.udp_socket):
             if sock is not None:

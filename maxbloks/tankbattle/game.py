@@ -11,12 +11,15 @@ Enhanced with:
 """
 
 import enum
+import logging
 import random
 import socket
 import subprocess
 import time
 
 import pygame
+
+logger = logging.getLogger(__name__)
 
 from maxbloks.tankbattle import ai
 from maxbloks.tankbattle import arena
@@ -66,20 +69,19 @@ class TankBattleGame:
     """Two-player top-down tank battle."""
 
     def __init__(self):
-        print("TankBattleGame.__init__")
+        logger.info("TankBattleGame initializing")
         screen, info = compat_sdl.init_display(
             size=(constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT),
             fullscreen=constants.FULLSCREEN,
             vsync=constants.VSYNC,
         )
-        print("pygame.init")
+        logger.debug("pygame.init")
         pygame.init()
 
         #pygame.joystick.init()
         #pygame.font.init()
 
-        print("pygame.event.get")
-        pygame.event.get()        
+        pygame.event.get()
         
         self.screen = screen
         self.display_info = info
@@ -136,11 +138,13 @@ class TankBattleGame:
 
     def run(self):
         """Run the main loop at 60 FPS."""
+        logger.info("Game loop starting")
         while self.running:
             dt = min(self.clock.tick(constants.FPS) / 1000.0, constants.MAX_DT)
             self.handle_input()
             self.update(dt)
             self.draw()
+        logger.info("Game loop exiting")
         self.input_reader.cleanup()
         self.net.close()
         pygame.quit()
@@ -226,6 +230,8 @@ class TankBattleGame:
 
     def _enter_lobby(self, is_host):
         """Transition from MENU to LOBBY, starting discovery."""
+        role = "host" if is_host else "client"
+        logger.info("Entering lobby as %s", role)
         self.lobby_is_host = is_host
         self.lobby_index = 0
         self.lobby_host_select_index = 0
@@ -265,17 +271,20 @@ class TankBattleGame:
                 self.lobby_index = (self.lobby_index + input_state.menu_y) % max(1, total_items)
 
         if input_state.pause_just_pressed:
+            logger.info("Leaving lobby, returning to menu")
             self.net.stop_discovery()
             self.state = GameState.MENU
         if input_state.confirm_just_pressed:
             if self.lobby_is_host:
                 # Host action menu
                 if self.lobby_index == 0:  # Start
+                    logger.info("Host starting match from lobby")
                     self.net.stop_discovery()
                     self.start_match()
                 elif self.lobby_index == 1:  # Manual IP — future work
                     pass
                 else:  # Back
+                    logger.info("Host leaving lobby, returning to menu")
                     self.net.stop_discovery()
                     self.state = GameState.MENU
             else:
@@ -299,12 +308,14 @@ class TankBattleGame:
 
     def _connect_to_selected_host(self, host_ip, host_port):
         """Attempt to connect to a selected host from the join lobby."""
+        logger.info("Connecting to host %s:%d", host_ip, host_port)
         try:
             self.net.connect_to_host(host_ip, host_port)
             self.lobby_connected_clients.append(host_ip)
             self.lobby_handshake_confirmed[host_ip] = True
+            logger.info("Connected to host %s", host_ip)
         except Exception as e:
-            print(f"TankBattle connect error: {e}")
+            logger.error("Connection to %s failed: %s", host_ip, e)
 
     # ------------------------------------------------------------------
     # Lobby update
@@ -324,6 +335,7 @@ class TankBattleGame:
             del self.lobby_client_last_seen[ip]
             # Also remove from handshake confirmed if stale
             self.lobby_handshake_confirmed.pop(ip, None)
+            logger.debug("Pruned stale peer %s from lobby", ip)
 
         # Refresh discovered peer list from NetworkManager
         self.lobby_discovered_clients = list(self.net.discovered_hosts)
@@ -528,6 +540,7 @@ class TankBattleGame:
         x_value, y_value = self.arena.random_open_position()
         power_type = random.choice(list(entities.PowerUpType))
         self.powerups.append(entities.PowerUp(x_value, y_value, power_type, self.powerup_next_id))
+        logger.debug("Spawned powerup %s (id=%d) at (%.0f, %.0f)", power_type.value, self.powerup_next_id, x_value, y_value)
         self.powerup_next_id += 1
         self.powerup_timer = random.uniform(constants.POWERUP_SPAWN_INTERVAL_MIN, constants.POWERUP_SPAWN_INTERVAL_MAX)
 
@@ -561,6 +574,7 @@ class TankBattleGame:
     def _check_round_end(self):
         if self.round_time_remaining <= 0.0 and not self.sudden_death:
             if self.tanks[0].hp == self.tanks[1].hp:
+                logger.info("Time expired with tied HP — entering sudden death")
                 self.sudden_death = True
                 for tank in self.tanks:
                     tank.clear_weapon()
@@ -576,9 +590,14 @@ class TankBattleGame:
 
     def _finish_round(self, winner_index):
         self.round_wins[winner_index] += 1
+        logger.info(
+            "Round over — player %d wins (score: %d-%d)",
+            winner_index + 1, self.round_wins[0], self.round_wins[1],
+        )
         self.state = GameState.ROUND_OVER
         self.state_timer = constants.ROUND_OVER_TIME
         if self.round_wins[winner_index] >= constants.ROUNDS_TO_WIN:
+            logger.info("Match over — player %d wins the match", winner_index + 1)
             self.state = GameState.MATCH_OVER
 
     def _advance_after_round(self):
@@ -590,11 +609,14 @@ class TankBattleGame:
             self.state_timer = constants.COUNTDOWN_TIME
 
     def start_match(self):
+        mode = "single-player" if self.single_player else "multiplayer"
+        logger.info("Starting match (%s)", mode)
         self.reset_round()
         self.state = GameState.COUNTDOWN
         self.state_timer = constants.COUNTDOWN_TIME
 
     def reset_round(self):
+        logger.debug("Resetting round state")
         self.arena.reset_round()
         self.tanks[0].reset(constants.SPAWN_ONE_X, constants.SPAWN_ONE_Y, 135.0)
         self.tanks[1].reset(constants.SPAWN_TWO_X, constants.SPAWN_TWO_Y, 315.0)

@@ -5,10 +5,13 @@
 
 import dataclasses
 import enum
+import logging
 import math
 
 from maxbloks.tankbattle import constants
 from maxbloks.tankbattle import utils
+
+logger = logging.getLogger(__name__)
 
 
 class WeaponType(enum.Enum):
@@ -236,8 +239,10 @@ class Tank:
             return
         self.hp = max(0, self.hp - amount)
         self.hit_flash_timer = constants.TANK_HIT_FLASH_TIME
+        logger.debug("Player %d took %d damage (hp=%d)", self.player_id, amount, self.hp)
         if self.hp == 0:
             self.is_alive = False
+            logger.info("Player %d destroyed", self.player_id)
 
     def heal(self, amount):
         """Restore HP up to the maximum."""
@@ -246,6 +251,7 @@ class Tank:
 
     def apply_powerup(self, power_type):
         """Apply a health or weapon pickup."""
+        logger.info("Player %d collected powerup: %s", self.player_id, power_type.value)
         if power_type == PowerUpType.HEALTH:
             self.heal(constants.HEALTH_PACK_RESTORE)
             return
@@ -374,6 +380,7 @@ class Mine:
             self.arm_timer = max(0.0, self.arm_timer - dt)
             if self.arm_timer == 0.0:
                 self.armed = True
+                logger.debug("Mine at (%.0f, %.0f) armed", self.x, self.y)
 
     def check_trigger(self, tanks):
         """Return detonated tanks and kill mine when triggered."""

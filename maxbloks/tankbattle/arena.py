@@ -3,11 +3,14 @@
 
 """Procedural arena and viewport helpers for TankBattle."""
 
+import logging
 import random
 
 from maxbloks.tankbattle import constants
 from maxbloks.tankbattle import entities
 from maxbloks.tankbattle import utils
+
+logger = logging.getLogger(__name__)
 
 
 class Arena:
@@ -34,6 +37,10 @@ class Arena:
         blocked = self._reserved_tiles()
         self._generate_hard_rocks(blocked)
         self._generate_soft_obstacles(blocked | self.hard_tiles)
+        logger.debug(
+            "Arena generated (seed=%d): %d hard tiles, %d soft tiles",
+            self.seed, len(self.hard_tiles), len(self.soft_tiles),
+        )
 
     def _reserved_tiles(self):
         reserved = set()
