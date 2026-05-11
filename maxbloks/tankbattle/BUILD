@@ -6,7 +6,7 @@ load("//tools:py_package_wheel.bzl", "py_package_wheel")
 
 py_library(
     name = "tankbattle",
-    srcs = glob(["*.py"]),
+    srcs = glob(["**/*.py"]),
     data = [
         "Tankbattle.sh",
         "game.json",
