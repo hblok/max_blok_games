@@ -92,7 +92,7 @@ class LobbyDiscovery:
             mreq = struct.pack(
                 "4s4s",
                 socket.inet_aton(constants.DISCOVERY_MULTICAST_GROUP),
-                socket.inet_aton("0.0.0.0"),
+                socket.inet_aton("0.0.0.0"),  # nosec: Listen to all
             )
             s.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         except Exception as e:
@@ -172,7 +172,7 @@ class LobbyDiscovery:
                 mreq = struct.pack(
                     "4s4s",
                     socket.inet_aton(constants.DISCOVERY_MULTICAST_GROUP),
-                    socket.inet_aton("0.0.0.0"),
+                    socket.inet_aton("0.0.0.0"),    # nosec: Listen to all
                 )
                 self._listen_socket.setsockopt(socket.IPPROTO_IP, socket.IP_DROP_MEMBERSHIP, mreq)
             except Exception:

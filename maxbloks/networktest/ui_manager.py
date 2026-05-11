@@ -70,7 +70,7 @@ class UIManager:
         self.font_small = pygame.font.Font(None, self._px(20))
 
         # State
-        self.local_ip = "0.0.0.0"
+        self.local_ip = "0.0.0.0"  # nosec
         self.discovered_devices: List[str] = []
         self.connected_devices: List[str] = []
         self.selected_index = 0

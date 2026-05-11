@@ -119,7 +119,7 @@ class TankBattleGame:
         self.lobby_discovered_clients = []  # list of {"address": ip, "port": port, "hosting": bool}
         self.lobby_connected_clients = []   # list of IP strings
         self.lobby_client_last_seen = {}    # ip -> timestamp
-        self.lobby_local_ip = "0.0.0.0"
+        self.lobby_local_ip = "0.0.0.0"     # nosec: Listen to all
         self.lobby_wifi_ssid = None
         # Track handshake-verified connections: ip -> bool
         self.lobby_handshake_confirmed = {}
