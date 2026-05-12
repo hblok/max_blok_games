@@ -32,13 +32,17 @@ def _try_init_pygame_display(size, fullscreen, allow_software=False):
 
     flags = 0
     if fullscreen:
-        flags |= pygame.FULLSCREEN
+        # SCALED asks pygame to upscale the logical canvas to the physical
+        # display, so the game always renders at its native resolution and
+        # fills the screen regardless of the device's actual pixel size
+        # (e.g., TrimUI Smart Pro at 1280×720 vs Anbernic at 640×480).
+        flags |= pygame.FULLSCREEN | getattr(pygame, "SCALED", 0)
 
     if allow_software:
         os.environ["SDL_RENDER_DRIVER"] = "software"
 
-    # If fullscreen, try to use desktop size if not provided
-    if fullscreen:
+    # If SCALED is unavailable (older pygame), fall back to native resolution
+    if fullscreen and not getattr(pygame, "SCALED", 0):
         try:
             info = pygame.display.Info()
             if info.current_w and info.current_h:
