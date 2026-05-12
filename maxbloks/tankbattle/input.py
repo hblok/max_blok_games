@@ -299,9 +299,9 @@ class InputReader:
             if num_buttons > 10 and self._joystick.get_button(10):
                 state.pause_pressed = True
             if num_buttons > 11 and self._joystick.get_button(11):
-                state.menu_up_pressed = True
-            if num_buttons > 12 and self._joystick.get_button(12):
                 state.menu_down_pressed = True
+            if num_buttons > 12 and self._joystick.get_button(12):
+                state.menu_up_pressed = True
             if num_buttons > 13 and self._joystick.get_button(13):
                 state.exit_pressed = True
         except Exception:
@@ -318,9 +318,9 @@ class InputReader:
                     state.turn += float(hat_x)
                     state.drive -= float(hat_y)
                     if hat_y < 0:
-                        state.menu_up_pressed = True
-                    elif hat_y > 0:
                         state.menu_down_pressed = True
+                    elif hat_y > 0:
+                        state.menu_up_pressed = True
         except Exception:
             pass
 
