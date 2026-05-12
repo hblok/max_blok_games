@@ -90,6 +90,11 @@ class InputReader:
         # Turret input smoothing (low-pass filter)
         self._smooth_turret_x = 0.0
         self._smooth_turret_y = 0.0
+        # Right-stick axis centres detected at calibration time.
+        # Non-zero means the device reports in [0, 1] (centre ≈ 0.5)
+        # rather than the standard [-1, 1] (centre = 0).
+        self._right_x_center = 0.0
+        self._right_y_center = 0.0
         self._init_joystick()
 
     def _init_joystick(self):
@@ -100,9 +105,43 @@ class InputReader:
                 self._joystick = self.pygame.joystick.Joystick(0)
                 self._joystick.init()
                 self._joystick_initialized = True
+                self._calibrate_right_stick()
         except Exception:
             self._joystick = None
             self._joystick_initialized = False
+
+    def _calibrate_right_stick(self):
+        """Sample right-stick resting values to detect non-standard axis ranges.
+
+        Some devices (e.g. TrimUI Smart Pro) report right-stick axes in the
+        [0, 1] range with a resting centre near 0.5 instead of the standard
+        [-1, 1] centre-at-0.  Sampling at startup lets us remap transparently.
+        Uses the same axis indices as _read_joystick (3,4 for 6+ axes else 2,3).
+        """
+        try:
+            n = self._joystick.get_numaxes()
+            if n >= 6:
+                pairs = [(3, "_right_x_center"), (4, "_right_y_center")]
+            elif n >= 4:
+                pairs = [(2, "_right_x_center"), (3, "_right_y_center")]
+            else:
+                return
+            for axis_idx, attr in pairs:
+                v = self._joystick.get_axis(axis_idx)
+                if abs(v) > 0.3:
+                    setattr(self, attr, v)
+        except Exception:
+            pass
+
+    def _normalize_axis(self, raw, center):
+        """Remap a possibly offset axis to the standard [-1, 1] range.
+
+        When *center* is near ±0.5 the axis is assumed to be in [0, 1]:
+        subtract the centre and double to recover the full signed range.
+        """
+        if abs(center) > 0.3:
+            return (raw - center) * 2.0
+        return raw
 
     def _check_joystick_reconnect(self):
         """Check if a joystick has been connected and initialize it."""
@@ -242,12 +281,19 @@ class InputReader:
             if num_axes >= 2:
                 left_x = utils.apply_deadzone(self._joystick.get_axis(0))
                 left_y = utils.apply_deadzone(self._joystick.get_axis(1))
-            if num_axes >= 4:
-                right_x = utils.apply_deadzone(self._joystick.get_axis(2))
-                right_y = utils.apply_deadzone(self._joystick.get_axis(3))
-            elif num_axes >= 6:
-                right_x = utils.apply_deadzone(self._joystick.get_axis(3))
-                right_y = utils.apply_deadzone(self._joystick.get_axis(4))
+            # Devices with 6+ axes (e.g. TrimUI Smart Pro) often place the
+            # right stick on axes 3,4 while axes 2,3 carry the triggers.
+            # Check the larger count first; the old elif was dead code.
+            if num_axes >= 6:
+                right_x = utils.apply_deadzone(
+                    self._normalize_axis(self._joystick.get_axis(3), self._right_x_center))
+                right_y = utils.apply_deadzone(
+                    self._normalize_axis(self._joystick.get_axis(4), self._right_y_center))
+            elif num_axes >= 4:
+                right_x = utils.apply_deadzone(
+                    self._normalize_axis(self._joystick.get_axis(2), self._right_x_center))
+                right_y = utils.apply_deadzone(
+                    self._normalize_axis(self._joystick.get_axis(3), self._right_y_center))
             # Left stick drives the tank via move-toward-stick scheme
             state.turn += left_x
             state.drive += left_y
