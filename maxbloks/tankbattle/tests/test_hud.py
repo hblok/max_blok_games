@@ -54,6 +54,7 @@ class _FakeGame:
     round_time_remaining = 60.0
     sudden_death = False
     single_player = True
+    local_player_index = 0
     arena = _FakeArena()
     powerups = []
     net = _FakeNet()
