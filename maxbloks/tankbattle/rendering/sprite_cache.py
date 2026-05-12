@@ -126,9 +126,10 @@ class SpriteCache:
             total_size = max(body_w, body_h) + 16
             surface = self.pygame.Surface((total_size, total_size), self.pygame.SRCALPHA)
             cx, cy = total_size // 2, total_size // 2
-            dark_color = tuple(max(0, c - 50) for c in base_color)
+            dark_color = tuple(max(0, c - 55) for c in base_color)
             mid_color = tuple(max(0, c - 25) for c in base_color)
-            light_color = tuple(min(255, c + 40) for c in base_color)
+            light_color = tuple(min(255, c + 50) for c in base_color)
+            # Tracks
             track_w = (body_w - 6) // 2
             track_h = body_h + 4
             left_track_rect = (cx - body_w // 2 - 1, cy - track_h // 2, track_w, track_h)
@@ -140,30 +141,40 @@ class SpriteCache:
                     self.pygame.draw.line(surface, (0, 0, 0, 120),
                                           (track_rect[0] + 1, tread_y),
                                           (track_rect[0] + track_rect[2] - 1, tread_y), 1)
+            # Hull base
             body_rect = (cx - body_w // 2, cy - body_h // 2, body_w, body_h)
             self.pygame.draw.rect(surface, base_color, body_rect, border_radius=3)
-            inner_rect = (cx - body_w // 2 + 3, cy - body_h // 2 + 3, body_w - 6, body_h - 6)
-            self.pygame.draw.rect(surface, mid_color, inner_rect, border_radius=2)
+            # Front armor plate — bright band at the front (top) of the hull so the
+            # forward direction is immediately recognisable
+            front_h = 8
+            front_rect = (body_rect[0] + 2, body_rect[1] + 2, body_w - 4, front_h)
+            self.pygame.draw.rect(surface, light_color, front_rect, border_radius=2)
+            # Centre hull panel — mid tone
+            center_rect = (body_rect[0] + 3, body_rect[1] + front_h + 3,
+                           body_w - 6, body_h - front_h - 12)
+            self.pygame.draw.rect(surface, mid_color, center_rect)
+            # Rear engine panel — dark band marking the back of the tank
+            rear_y = body_rect[1] + body_h - 9
+            self.pygame.draw.rect(surface, dark_color,
+                                  (body_rect[0] + 2, rear_y, body_w - 4, 7), border_radius=2)
+            # Exhaust ports in rear panel
+            exhaust_color = (20, 20, 20)
+            self.pygame.draw.rect(surface, exhaust_color,
+                                  (body_rect[0] + 5, rear_y + 2, 5, 3))
+            self.pygame.draw.rect(surface, exhaust_color,
+                                  (body_rect[0] + body_w - 10, rear_y + 2, 5, 3))
+            # Hull outline
             self.pygame.draw.rect(surface, dark_color, body_rect, 2, border_radius=3)
-            self.pygame.draw.line(surface, light_color,
-                                  (body_rect[0] + 4, body_rect[1] + 2),
-                                  (body_rect[0] + body_rect[2] - 4, body_rect[1] + 2), 1)
-            turret_w = constants.TANK_TURRET_WIDTH
-            turret_h = constants.TANK_BODY_HEIGHT
-            turret_rect = (cx - turret_w // 2, cy - turret_h // 2, turret_w, turret_h)
-            self.pygame.draw.rect(surface, base_color, turret_rect, border_radius=2)
-            self.pygame.draw.rect(surface, dark_color, turret_rect, 1, border_radius=2)
-            self.pygame.draw.line(surface, light_color,
-                                  (turret_rect[0] + 2, turret_rect[1] + 1),
-                                  (turret_rect[0] + turret_rect[2] - 2, turret_rect[1] + 1), 1)
-            hatch_x = cx + turret_w // 2 + 2
+            # Circular turret mount ring
+            self.pygame.draw.circle(surface, dark_color, (cx, cy), 9)
+            self.pygame.draw.circle(surface, mid_color, (cx, cy), 7)
+            self.pygame.draw.circle(surface, dark_color, (cx, cy), 9, 2)
+            # Hatch (right of turret ring)
+            hatch_x = cx + 9 + 2
             hatch_y = cy - 4
-            self.pygame.draw.rect(surface, dark_color, (hatch_x, hatch_y, 8, 8), border_radius=2)
-            self.pygame.draw.rect(surface, mid_color, (hatch_x + 1, hatch_y + 1, 6, 6), border_radius=1)
-            muzzle_w = turret_w + 4
-            muzzle_h = 4
-            muzzle_rect = (cx - muzzle_w // 2, cy - turret_h // 2 - muzzle_h, muzzle_w, muzzle_h)
-            self.pygame.draw.rect(surface, dark_color, muzzle_rect, border_radius=1)
+            self.pygame.draw.rect(surface, dark_color, (hatch_x, hatch_y, 7, 7), border_radius=2)
+            self.pygame.draw.rect(surface, mid_color, (hatch_x + 1, hatch_y + 1, 5, 5), border_radius=1)
+            # Drop shadow
             shadow_surface = self.pygame.Surface((total_size, total_size), self.pygame.SRCALPHA)
             shadow_body = (body_rect[0] + 3, body_rect[1] + 3, body_rect[2], body_rect[3])
             self.pygame.draw.rect(shadow_surface, (0, 0, 0, 40), shadow_body, border_radius=3)
@@ -184,30 +195,39 @@ class SpriteCache:
         surface is created only once.
         """
         for color_key, base_color in [("green", constants.COLOR_GREEN), ("red", constants.COLOR_RED)]:
-            dark_color = tuple(max(0, c - 50) for c in base_color)
-            mid_color = tuple(max(0, c - 25) for c in base_color)
-            light_color = tuple(min(255, c + 40) for c in base_color)
+            light_color = tuple(min(255, c + 50) for c in base_color)
             size = 48
             surface = self.pygame.Surface((size, size), self.pygame.SRCALPHA)
             cx, cy = size // 2, size // 2
             turret_w = constants.TANK_TURRET_WIDTH
             turret_h = constants.TANK_BODY_HEIGHT
+            # Barrel and muzzle in dark charcoal — high contrast against both
+            # green and red hull, making the aiming direction easy to read.
+            barrel_color = (45, 45, 45)
+            barrel_rim = (90, 90, 90)
             barrel_rect = (cx - turret_w // 2, cy - turret_h // 2, turret_w, turret_h)
-            self.pygame.draw.rect(surface, base_color, barrel_rect, border_radius=2)
-            self.pygame.draw.rect(surface, dark_color, barrel_rect, 1, border_radius=2)
-            self.pygame.draw.line(surface, light_color,
-                                  (barrel_rect[0] + 2, barrel_rect[1] + 1),
-                                  (barrel_rect[0] + barrel_rect[2] - 2, barrel_rect[1] + 1), 1)
+            self.pygame.draw.rect(surface, barrel_color, barrel_rect, border_radius=2)
+            # Highlight ridge along the left edge of the barrel
+            self.pygame.draw.line(surface, barrel_rim,
+                                  (barrel_rect[0] + 1, barrel_rect[1] + 3),
+                                  (barrel_rect[0] + 1, barrel_rect[1] + barrel_rect[3] - 3), 1)
+            # Muzzle block
             muzzle_w = turret_w + 4
             muzzle_h = 5
             muzzle_rect = (cx - muzzle_w // 2, cy - turret_h // 2 - muzzle_h, muzzle_w, muzzle_h)
-            self.pygame.draw.rect(surface, dark_color, muzzle_rect, border_radius=1)
-            self.pygame.draw.rect(surface, mid_color,
-                                  (cx - turret_w // 2 - 1, cy - 6, turret_w + 2, 12),
-                                  border_radius=3)
-            self.pygame.draw.rect(surface, dark_color,
-                                  (cx - turret_w // 2 - 1, cy - 6, turret_w + 2, 12),
-                                  1, border_radius=3)
+            self.pygame.draw.rect(surface, barrel_color, muzzle_rect, border_radius=1)
+            # Bright muzzle tip — unmistakably marks the firing direction
+            muzzle_tip_y = muzzle_rect[1] + 2
+            self.pygame.draw.circle(surface, (255, 245, 130), (cx, muzzle_tip_y), 3)
+            self.pygame.draw.circle(surface, (255, 255, 220), (cx, muzzle_tip_y), 1)
+            # Turret dome — dark shell with a team-colour inner ring so the
+            # dome stands out from the barrel and hull simultaneously
+            dome_r = turret_w + 1
+            self.pygame.draw.circle(surface, (40, 40, 40), (cx, cy), dome_r)
+            self.pygame.draw.circle(surface, base_color, (cx, cy), dome_r - 3)
+            self.pygame.draw.circle(surface, (20, 20, 20), (cx, cy), dome_r, 2)
+            # Glint on dome
+            self.pygame.draw.circle(surface, light_color, (cx - 1, cy - 2), 2)
             self._cache[f"turret_{color_key}"] = surface
 
     # ------------------------------------------------------------------
