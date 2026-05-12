@@ -246,7 +246,7 @@ class NetworkManager:
 
         # Non-blocking read
         try:
-            data = sock.recv(4096)
+            data = sock.recv(65536)
             if data:
                 self._tcp_recv_buffer += data
                 self.monitor.mark_received()
@@ -329,15 +329,22 @@ class NetworkManager:
         except Exception:
             pass
 
-    def receive_udp_pings(self):
-        """Check for incoming UDP ping/pong messages and update the
-        connection monitor.  Should be called once per frame.
+    def receive_udp(self):
+        """Read ALL pending UDP packets from the game-data socket and
+        dispatch them by type.
 
-        Note: player-update packets (JSON arrays) are handled by
-        ``receive_player_updates()`` and are silently skipped here.
+        This single method replaces the previous separate
+        ``receive_udp_pings()`` and ``receive_player_updates()`` so
+        that one pass over the socket drains it completely and no
+        packet type is accidentally consumed by the wrong handler.
+
+        Returns a list of PlayerUpdatePacket objects received this
+        frame (may be empty).
         """
+        updates = []
         if self.udp_socket is None:
-            return
+            return updates
+
         while True:
             try:
                 data, addr = self.udp_socket.recvfrom(constants.MAX_PACKET_SIZE)
@@ -345,18 +352,35 @@ class NetworkManager:
                 break
             except Exception:
                 break
+
+            # --- Try player-update first (JSON array) ---
+            try:
+                packet = _packet.PacketCodec.deserialize_player_update(data)
+                self.dead_reckoner.push_update(packet)
+                self.last_remote_update = packet
+                self.monitor.mark_received()
+                logger.debug(
+                    "UDP recv player update (player=%d, pos=(%.1f,%.1f)) from %s",
+                    packet.player_id, packet.x, packet.y, addr[0],
+                )
+                updates.append(packet)
+                continue  # packet handled, read next
+            except (ValueError, json.JSONDecodeError, UnicodeDecodeError,
+                    IndexError, TypeError, KeyError):
+                # Not a player-update packet – fall through to ping/pong
+                pass
+
+            # --- Try ping / pong (JSON object) ---
             try:
                 msg = json.loads(data.decode("utf-8"))
             except (json.JSONDecodeError, UnicodeDecodeError):
-                # Not valid JSON – skip
-                continue
-            # Player update packets are JSON arrays; skip them here
-            # (they are handled by receive_player_updates)
-            if isinstance(msg, list):
-                continue
+                continue  # not valid JSON at all
+
+            if not isinstance(msg, dict):
+                continue  # unexpected shape
+
             msg_type = msg.get("type", "")
             if msg_type == constants.PING_PREFIX:
-                # Echo back as pong with the same timestamp
                 instance_id = msg.get("instance_id", "")
                 ts = msg.get("ts", 0.0)
                 pong = json.dumps({
@@ -373,6 +397,8 @@ class NetworkManager:
                 if ts > 0:
                     self.monitor.record_pong(ts)
                     self.monitor.mark_received()
+
+        return updates
 
     # ------------------------------------------------------------------
     # Legacy handshake (still used for initial TCP connection)
@@ -434,37 +460,7 @@ class NetworkManager:
             logger.error("Failed to send player update: %s", e)
             return False
 
-    def receive_player_updates(self):
-        """Receive and process incoming UDP player-update packets.
 
-        Should be called once per frame during gameplay.  Returns a
-        list of PlayerUpdatePacket objects received this frame.
-        """
-        updates = []
-        if self.udp_socket is None:
-            return updates
-        while True:
-            try:
-                data, addr = self.udp_socket.recvfrom(constants.MAX_PACKET_SIZE)
-            except BlockingIOError:
-                break
-            except Exception:
-                break
-            # Try to parse as a player update (JSON array)
-            try:
-                packet = _packet.PacketCodec.deserialize_player_update(data)
-                self.dead_reckoner.push_update(packet)
-                self.last_remote_update = packet
-                self.monitor.mark_received()
-                logger.debug(
-                    "Received player update (player=%d, pos=(%.1f,%.1f)) from %s",
-                    packet.player_id, packet.x, packet.y, addr[0],
-                )
-                updates.append(packet)
-            except (ValueError, json.JSONDecodeError, UnicodeDecodeError, IndexError):
-                # Not a player update packet – might be a ping; skip
-                continue
-        return updates
 
     # ------------------------------------------------------------------
     # Cleanup
