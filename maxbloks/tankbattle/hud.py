@@ -23,7 +23,7 @@ class Hud:
         """Draw all HUD elements."""
         self._draw_hp(screen, game.local_tank)
         self._draw_weapon(screen, game.local_tank)
-        self._draw_round_pips(screen, game.round_wins)
+        self._draw_round_pips(screen, game.round_wins, game.local_player_index)
         self._draw_timer(screen, game)
         self._draw_minimap(screen, game)
         # Issue 3: In-game connection status widget
@@ -109,7 +109,7 @@ class Hud:
                 shots = self.small_font.render(str(tank.weapon_shots), True, constants.COLOR_WHITE)
                 screen.blit(shots, (bar_x + bar_width + 4, bar_y - 3))
 
-    def _draw_round_pips(self, screen, wins):
+    def _draw_round_pips(self, screen, wins, local_player_index):
         bg_width = constants.ROUNDS_TO_WIN * constants.HUD_PIP_RADIUS * 3 + 10
         bg_height = 2 * constants.HUD_PIP_RADIUS * 3 + 10
         bg_surf = self.pygame.Surface((bg_width, bg_height), self.pygame.SRCALPHA)
@@ -117,7 +117,7 @@ class Hud:
         self.pygame.draw.rect(bg_surf, (255, 255, 255, 40), (0, 0, bg_width, bg_height), 1, border_radius=4)
         screen.blit(bg_surf, (constants.HUD_ROUND_X - 5, constants.HUD_ROUND_Y - 5))
         for player in range(2):
-            base_color = constants.COLOR_GREEN if player == 0 else constants.COLOR_RED
+            base_color = constants.COLOR_GREEN if player == local_player_index else constants.COLOR_RED
             for pip in range(constants.ROUNDS_TO_WIN):
                 x_value = constants.HUD_ROUND_X + pip * constants.HUD_PIP_RADIUS * 3
                 y_value = constants.HUD_ROUND_Y + player * constants.HUD_PIP_RADIUS * 3
@@ -184,8 +184,9 @@ class Hud:
             px = min(px, constants.HUD_MINIMAP_WIDTH - 2)
             py = min(py, constants.HUD_MINIMAP_HEIGHT - 2)
             self.minimap_surface.set_at((max(0, px), max(0, py)), constants.COLOR_YELLOW)
-        self._draw_tank_dot(game.tanks[0], constants.COLOR_GREEN)
-        self._draw_tank_dot(game.tanks[1], constants.COLOR_RED)
+        for idx, tank in enumerate(game.tanks):
+            dot_color = constants.COLOR_GREEN if idx == game.local_player_index else constants.COLOR_RED
+            self._draw_tank_dot(tank, dot_color)
         camera = game.arena.clamp_camera(game.local_tank.position)
         cam_x = int(camera[0] * constants.HUD_MINIMAP_SCALE_X)
         cam_y = int(camera[1] * constants.HUD_MINIMAP_SCALE_Y)

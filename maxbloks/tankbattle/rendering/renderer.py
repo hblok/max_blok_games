@@ -167,12 +167,12 @@ class Renderer:
                     self.pygame.draw.circle(self.screen, constants.COLOR_WHITE, (isx, isy), 3)
 
     def _draw_tanks(self, game, camera):
-        tank_color_keys = ["green", "red"]
         for idx, tank in enumerate(game.tanks):
             if not tank.is_alive:
                 self._draw_destroyed_tank(game, tank, camera)
                 continue
-            self._draw_alive_tank(game, tank, camera, tank_color_keys[idx])
+            color_key = "green" if idx == game.local_player_index else "red"
+            self._draw_alive_tank(game, tank, camera, color_key)
 
     def _draw_alive_tank(self, game, tank, camera, color_key):
         sx, sy = game.arena.world_to_screen(tank.position, camera)
