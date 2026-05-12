@@ -110,12 +110,14 @@ class Hud:
                 screen.blit(shots, (bar_x + bar_width + 4, bar_y - 3))
 
     def _draw_round_pips(self, screen, wins, local_player_index):
-        bg_width = constants.ROUNDS_TO_WIN * constants.HUD_PIP_RADIUS * 3 + 10
-        bg_height = 2 * constants.HUD_PIP_RADIUS * 3 + 10
+        r = constants.HUD_PIP_RADIUS
+        spacing = r * 3
+        bg_width = (constants.ROUNDS_TO_WIN - 1) * spacing + 2 * r + 10
+        bg_height = spacing + 2 * r + 10
         bg_surf = self.pygame.Surface((bg_width, bg_height), self.pygame.SRCALPHA)
         self.pygame.draw.rect(bg_surf, (0, 0, 0, 120), (0, 0, bg_width, bg_height), border_radius=4)
         self.pygame.draw.rect(bg_surf, (255, 255, 255, 40), (0, 0, bg_width, bg_height), 1, border_radius=4)
-        screen.blit(bg_surf, (constants.HUD_ROUND_X - 5, constants.HUD_ROUND_Y - 5))
+        screen.blit(bg_surf, (constants.HUD_ROUND_X - r - 5, constants.HUD_ROUND_Y - r - 5))
         for player in range(2):
             base_color = constants.COLOR_GREEN if player == local_player_index else constants.COLOR_RED
             for pip in range(constants.ROUNDS_TO_WIN):
