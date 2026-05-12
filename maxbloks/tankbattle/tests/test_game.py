@@ -240,3 +240,35 @@ class TestTankBattleGame(unittest.TestCase):
         inp.confirm_just_pressed = True
         self.g.handle_input_match_over(inp)
         self.assertEqual(self.g.round_wins, [0, 0])
+
+    # --- _resolve_tank_collision ---
+
+    def test_resolve_tank_collision_separates_overlapping_tanks(self):
+        a, b = self.g.tanks[0], self.g.tanks[1]
+        a.is_alive = True
+        b.is_alive = True
+        a.x, a.y = 400.0, 400.0
+        b.x, b.y = 400.0, 400.0  # fully overlapping
+        self.g._resolve_tank_collision()
+        dist = ((a.x - b.x) ** 2 + (a.y - b.y) ** 2) ** 0.5
+        self.assertGreaterEqual(dist, 2 * constants.TANK_HITBOX_RADIUS - 0.01)
+
+    def test_resolve_tank_collision_no_effect_when_far_apart(self):
+        a, b = self.g.tanks[0], self.g.tanks[1]
+        a.is_alive = True
+        b.is_alive = True
+        a.x, a.y = 200.0, 200.0
+        b.x, b.y = 600.0, 600.0
+        self.g._resolve_tank_collision()
+        self.assertAlmostEqual(a.x, 200.0)
+        self.assertAlmostEqual(b.x, 600.0)
+
+    def test_resolve_tank_collision_skips_dead_tanks(self):
+        a, b = self.g.tanks[0], self.g.tanks[1]
+        a.is_alive = False
+        b.is_alive = True
+        a.x, a.y = 400.0, 400.0
+        b.x, b.y = 400.0, 400.0
+        self.g._resolve_tank_collision()
+        self.assertAlmostEqual(b.x, 400.0)
+        self.assertAlmostEqual(b.y, 400.0)

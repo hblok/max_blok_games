@@ -506,6 +506,7 @@ class TankBattleGame:
         self.round_time_remaining -= dt
         for tank in self.tanks:
             tank.update(dt)
+        self._resolve_tank_collision()
         self._update_projectiles(dt)
         self._update_powerups(dt)
         self._check_round_end()
@@ -528,6 +529,27 @@ class TankBattleGame:
 
     def update_match_over(self, dt):
         pass
+
+    def _resolve_tank_collision(self):
+        """Push overlapping tanks apart so they cannot drive through each other."""
+        alive_tanks = [t for t in self.tanks if t.is_alive]
+        for i in range(len(alive_tanks)):
+            for j in range(i + 1, len(alive_tanks)):
+                a = alive_tanks[i]
+                b = alive_tanks[j]
+                dist = utils.distance(a.position, b.position)
+                min_dist = 2 * constants.TANK_HITBOX_RADIUS
+                if dist < min_dist:
+                    if dist == 0:
+                        nx, ny, overlap = 0.0, 1.0, min_dist / 2.0
+                    else:
+                        overlap = (min_dist - dist) / 2.0
+                        nx = (b.x - a.x) / dist
+                        ny = (b.y - a.y) / dist
+                    a.x = utils.clamp(a.x - nx * overlap, constants.TANK_HITBOX_RADIUS, constants.WORLD_WIDTH - constants.TANK_HITBOX_RADIUS)
+                    a.y = utils.clamp(a.y - ny * overlap, constants.TANK_HITBOX_RADIUS, constants.WORLD_HEIGHT - constants.TANK_HITBOX_RADIUS)
+                    b.x = utils.clamp(b.x + nx * overlap, constants.TANK_HITBOX_RADIUS, constants.WORLD_WIDTH - constants.TANK_HITBOX_RADIUS)
+                    b.y = utils.clamp(b.y + ny * overlap, constants.TANK_HITBOX_RADIUS, constants.WORLD_HEIGHT - constants.TANK_HITBOX_RADIUS)
 
     def _update_projectiles(self, dt):
         for bullet in self.bullets:
