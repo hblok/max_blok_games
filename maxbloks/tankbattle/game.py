@@ -291,12 +291,15 @@ class TankBattleGame:
                     self.net.stop_discovery()
                     self.local_player_index = 0
                     self.single_player = False
-                    # Send arena data to client before starting match
+                    # Send arena seed to client so it generates the same map.
+                    # We only send the seed (not the full obstacle list)
+                    # because Arena() generates deterministically from it,
+                    # and the full serialised arena (~140 KB) caused the
+                    # TCP recv buffer to overflow and lose the match_start
+                    # event that follows.
                     if self.net.tcp_socket_client is not None:
-                        arena_data = self.arena.serialize()
-                        self.net.send_reliable_event("arena_data", arena_data)
-                        logger.info("Host: Sent arena data to client (seed=%d)", arena_data["seed"])
-                        # Then send match_start event
+                        self.net.send_reliable_event("arena_seed", {"seed": self.arena.seed})
+                        logger.info("Host: Sent arena seed to client (seed=%d)", self.arena.seed)
                         self.net.send_reliable_event("match_start")
                         logger.info("Host: Sent match_start event to client")
                     self.start_match()
@@ -398,10 +401,13 @@ class TankBattleGame:
         # Process TCP messages (welcome handshake, reliable events)
         events = self.net.process_tcp_messages()
         for event_name, payload in events:
-            if event_name == "arena_data" and not self.lobby_is_host:
-                logger.info("Client: Received arena data from host (seed=%d)", payload.get("seed"))
-                # Rebuild arena from host's data so both sides play on identical map
-                self.arena = arena.Arena.deserialize(payload)
+            logger.debug("Lobby TCP event: %s (payload keys=%s)", event_name, list(payload.keys()) if isinstance(payload, dict) else type(payload).__name__)
+            if event_name == "arena_seed" and not self.lobby_is_host:
+                seed = payload.get("seed", 0)
+                logger.info("Client: Received arena seed from host (seed=%d)", seed)
+                # Rebuild arena from the host's seed so both sides play on identical map
+                self.arena = arena.Arena(seed)
+                logger.info("Client: Rebuilt arena from host seed")
             elif event_name == "match_start" and not self.lobby_is_host:
                 logger.info("Client: Received match_start from host — starting match")
                 self.net.stop_discovery()
@@ -503,13 +509,12 @@ class TankBattleGame:
         self._update_projectiles(dt)
         self._update_powerups(dt)
         self._check_round_end()
-        # Network: send local state, receive remote state
-        self._send_network_update()
-        self._receive_network_updates()
-        # Connection monitoring via ping/pong
+        # Network: send local state, receive all UDP (player updates
+        # + pings) in a single pass, then handle TCP.
         if not self.single_player:
+            self._send_network_update()
+            self._receive_network_updates()
             self.net.send_ping_if_due()
-            self.net.receive_udp_pings()
             # Process any TCP messages during gameplay too
             self.net.process_tcp_messages()
 
@@ -705,10 +710,14 @@ class TankBattleGame:
         self._net_powerup_collected_id = -1
 
     def _receive_network_updates(self):
-        """Receive and apply remote player updates from UDP packets."""
+        """Receive and apply remote player updates from UDP packets.
+
+        Uses the unified ``receive_udp()`` which handles player updates,
+        pings, and pongs in a single socket read pass.
+        """
         if self.single_player:
             return
-        updates = self.net.receive_player_updates()
+        updates = self.net.receive_udp()
         for packet in updates:
             # Find the remote tank (player_id is 1-indexed)
             remote_idx = packet.player_id - 1
