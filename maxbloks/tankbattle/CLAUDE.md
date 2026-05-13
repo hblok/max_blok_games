@@ -161,3 +161,13 @@ Headless pygame is initialised per-file via `SDL_VIDEODRIVER=dummy` / `SDL_AUDIO
 - Audio playback and sprite asset art are placeholders (`.gitkeep` in `assets/`).
 - Full host-authoritative reconciliation (client correction on divergence) is future work.
 - Integration tests using loopback sockets are future work.
+
+## Planned features (implementation hooks)
+
+See `TODO.md` §7–9 for the full checklists.
+
+| Feature | Key files | Notes |
+|---|---|---|
+| **Neutral AI tanks** | `entities.py`, `ai.py`, `gameplay.py`, `net_handlers.py`, `rendering/` | `is_neutral` flag on `Tank`; generalise `TankAI` targets; host-authoritative `neutral_sync` TCP event every 100 ms; grey/yellow sprite palette |
+| **Supply crates** | `entities.py`, `gameplay.py`, `net_handlers.py`, `rendering/` | New `Crate` dataclass; bullet–crate collision in `_update_projectiles()`; `crate_destroyed` reliable TCP event drops a power-up |
+| **Speed Boost / Shield** | `entities.py`, `constants.py`, `rendering/renderer.py` | Slot into existing `PowerUpType` / `Tank.apply_powerup()`; no UDP protocol change needed |
