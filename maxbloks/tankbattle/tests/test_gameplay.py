@@ -42,6 +42,8 @@ class _StubGame(gameplay.GameplayMixin):
         self._net_powerup_collected_id = -1
         self._hp_sync_timer = 0.0
         self.match_seed = 0
+        self.neutral_tanks = []
+        self.neutral_ais = []
         self.renderer = types.SimpleNamespace(
             register_hit=lambda b: None,
             register_mine_explosion=lambda m: None,

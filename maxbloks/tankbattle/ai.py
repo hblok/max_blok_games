@@ -19,10 +19,17 @@ class TankAI:
     def __init__(self):
         self._fire_timer = 0.0
 
-    def update(self, ai_tank, target_tank, game, dt):
-        """Apply movement and firing to ai_tank for one frame."""
-        if not ai_tank.is_alive or not target_tank.is_alive:
+    def update(self, ai_tank, targets, game, dt):
+        """Apply movement and firing to ai_tank for one frame.
+
+        targets: list of Tank objects to attack; picks the nearest alive one.
+        """
+        if not ai_tank.is_alive:
             return
+        alive = [t for t in targets if t.is_alive]
+        if not alive:
+            return
+        target_tank = min(alive, key=lambda t: math.hypot(t.x - ai_tank.x, t.y - ai_tank.y))
         dx = target_tank.x - ai_tank.x
         dy = target_tank.y - ai_tank.y
         dist = math.hypot(dx, dy)

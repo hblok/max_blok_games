@@ -65,6 +65,9 @@ class TankBattleGame(menu.MenuMixin, gameplay.GameplayMixin, net_handlers.Networ
         self.local_player_index = 0
         self.single_player = False
         self.tank_ai = ai.TankAI()
+        self.neutral_tanks = []
+        self.neutral_ais = [ai.TankAI() for _ in range(constants.NEUTRAL_TANK_COUNT)]
+        self._neutral_sync_timer = 0.0
         self.bullets = []
         self.mines = []
         self.powerups = []
@@ -249,7 +252,8 @@ class TankBattleGame(menu.MenuMixin, gameplay.GameplayMixin, net_handlers.Networ
             self._apply_tank_input(self.pending_input, dt)
             self.pending_input = None
         if self.single_player:
-            self.tank_ai.update(self.tanks[1], self.tanks[0], self, dt)
+            self.tank_ai.update(self.tanks[1], [self.tanks[0]], self, dt)
+        self._update_neutral_tanks(dt)
         self.round_time_remaining -= dt
         for tank in self.tanks:
             tank.update(dt)
@@ -264,6 +268,7 @@ class TankBattleGame(menu.MenuMixin, gameplay.GameplayMixin, net_handlers.Networ
             events = self.net.process_tcp_messages()
             self._handle_tcp_events_playing(events)
             self._send_hp_sync(dt)
+            self._send_neutral_sync(dt)
 
     def update_paused(self, dt):
         pass

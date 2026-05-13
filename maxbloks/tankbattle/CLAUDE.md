@@ -133,7 +133,7 @@ From the repository root, run:
 python3 -m unittest discover -s maxbloks/tankbattle/tests
 ```
 
-210 tests pass. Each subpackage has its own test file:
+370 tests pass. Each subpackage has its own test file:
 
 | Test file | Covers |
 |---|---|
@@ -152,6 +152,7 @@ python3 -m unittest discover -s maxbloks/tankbattle/tests
 | `test_rendering_sprite_cache.py` | tile, tank, weapon, power-up, effect surfaces |
 | `test_rendering_particle_system.py` | emit counts, physics math, pool lookup, draw smoke test |
 | `test_rendering_renderer.py` | timer management, register_* emission, draw smoke tests |
+| `test_neutral_tanks.py` | spawn count, AI targeting, collision, power-up drop, network sync |
 
 Headless pygame is initialised per-file via `SDL_VIDEODRIVER=dummy` / `SDL_AUDIODRIVER=dummy` set at module level before any pygame import.
 
