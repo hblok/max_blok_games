@@ -31,7 +31,7 @@ class NetworkManager:
         each other.
     """
 
-    def __init__(self):
+    def __init__(self, game_data_port=constants.GAME_DATA_PORT):
         self.role = None
         self.tcp_socket = None
         self.tcp_socket_client = None  # accepted client connection (host side)
@@ -51,6 +51,12 @@ class NetworkManager:
         self.dead_reckoner = _dr.DeadReckoner()
         # Last received player update (for game to query)
         self.last_remote_update = None
+        # Local UDP bind port; override for tests to avoid conflicts when
+        # two instances share the same loopback address.
+        self._game_data_port = game_data_port
+        # Remote UDP port to send player updates and pings to; defaults to
+        # the same port as the local bind so production config is unchanged.
+        self._peer_game_data_port = game_data_port
 
     def _get_local_ip(self):
         """Get the local IP address of this device."""
@@ -110,11 +116,11 @@ class NetworkManager:
             # The discovery port (5556) is managed by LobbyDiscovery,
             # so we use a separate port for in-game UDP traffic.
             try:
-                game_port = constants.GAME_DATA_PORT  # 5557
-                self.udp_socket.bind(("", game_port))
-                logger.info("UDP game-data socket bound to port %d", game_port)
+                self.udp_socket.bind(("", self._game_data_port))
+                logger.info("UDP game-data socket bound to port %d", self._game_data_port)
             except OSError as e:
-                logger.warning("Could not bind UDP game socket to port %d: %s", game_port, e)
+                logger.warning("Could not bind UDP game socket to port %d: %s",
+                               self._game_data_port, e)
 
     # ------------------------------------------------------------------
     # Discovery
@@ -322,8 +328,7 @@ class NetworkManager:
         try:
             data = _packet.PacketCodec.serialize_ping(self._instance_id, now)
             target = self.remote_address
-            # Send ping to the game data port
-            self.udp_socket.sendto(data, (target[0], constants.GAME_DATA_PORT))
+            self.udp_socket.sendto(data, (target[0], self._peer_game_data_port))
             self._last_ping_sent = now
             self.monitor.mark_ping_sent(now)
         except Exception:
@@ -389,7 +394,10 @@ class NetworkManager:
                     "ts": ts,
                 }, separators=(",", ":")).encode("utf-8")
                 try:
-                    self.udp_socket.sendto(pong, (addr[0], constants.GAME_DATA_PORT))
+                    # Reply to the port the sender was bound to (addr[1]).
+                    # In production this equals GAME_DATA_PORT; on loopback
+                    # with custom ports it reaches the right socket.
+                    self.udp_socket.sendto(pong, (addr[0], addr[1]))
                 except Exception:
                     pass
             elif msg_type == "TANKBATTLE_PONG":
@@ -449,11 +457,10 @@ class NetworkManager:
         try:
             data = _packet.PacketCodec.serialize_player_update(packet)
             target_ip = self.remote_address[0]
-            target_port = constants.GAME_DATA_PORT  # game data port
-            self.udp_socket.sendto(data, (target_ip, target_port))
+            self.udp_socket.sendto(data, (target_ip, self._peer_game_data_port))
             logger.debug(
                 "Sent player update (player=%d, pos=(%.1f,%.1f)) to %s:%d",
-                packet.player_id, packet.x, packet.y, target_ip, target_port,
+                packet.player_id, packet.x, packet.y, target_ip, self._peer_game_data_port,
             )
             return True
         except Exception as e:
