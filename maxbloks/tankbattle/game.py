@@ -78,8 +78,13 @@ class TankBattleGame:
             fullscreen=fullscreen,
             vsync=constants.VSYNC,
         )
+        logger.debug("TankBattleGame - pygame.mixer.pre_init")
+        pygame.mixer.pre_init(frequency=22050, size=-16, channels=1, buffer=512)
         logger.debug("TankBattleGame - pygame.init")
-        pygame.init()
+        success, fail = pygame.init()
+        logger.info("pygame.init() success=%d fail=%d", success, fail)
+        mixer_state = pygame.mixer.get_init()
+        logger.info("mixer state after pygame.init(): %s", mixer_state)
 
         #pygame.joystick.init()
         #pygame.font.init()

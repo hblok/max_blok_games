@@ -11,6 +11,7 @@ real assets.
 import array
 import logging
 import math
+import os
 import pathlib
 import random
 
@@ -53,25 +54,36 @@ class SoundManager:
 
     def _init_mixer(self):
         try:
+            drv = os.environ.get("SDL_AUDIODRIVER", "(auto)")
+            logger.info("SoundManager: SDL_AUDIODRIVER=%s", drv)
             result = self.pygame.mixer.get_init()
+            logger.info("SoundManager: mixer state before init: %s", result)
             already_init = result and result != (0, 0, 0)
             if not already_init:
+                logger.info("SoundManager: calling mixer.init()")
                 self.pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=512)
+            else:
+                logger.info("SoundManager: mixer already initialized, skipping init()")
+            logger.info("SoundManager: mixer state after: %s", self.pygame.mixer.get_init())
             self._enabled = True
+            logger.info("SoundManager: audio enabled")
         except Exception as exc:
             logger.warning("SoundManager: audio disabled (%s)", exc)
 
     def _load_all(self):
         freq, _size, channels = self.pygame.mixer.get_init()
+        logger.info("SoundManager: loading sounds (freq=%d channels=%d)", freq, channels)
         for name in _SOUND_NAMES:
             path = _ASSETS_DIR / f"{name}.ogg"
             if path.is_file():
                 try:
                     self._sounds[name] = self.pygame.mixer.Sound(str(path))
+                    logger.info("SoundManager: loaded %s from disk", name)
                     continue
                 except Exception as exc:
                     logger.warning("SoundManager: could not load %s (%s)", path, exc)
             self._sounds[name] = self._synthesize(name, freq, channels)
+            logger.debug("SoundManager: synthesized %s", name)
 
     # ------------------------------------------------------------------
     # Synthesis helpers
@@ -155,10 +167,14 @@ class SoundManager:
 
     def _play(self, name):
         if not self._enabled:
+            logger.debug("SoundManager: _play(%s) skipped — audio disabled", name)
             return
         sound = self._sounds.get(name)
         if sound:
+            logger.debug("SoundManager: playing %s", name)
             sound.play()
+        else:
+            logger.debug("SoundManager: _play(%s) — sound not found", name)
 
     def play_shoot(self):
         self._play("shoot")
