@@ -94,12 +94,20 @@ class TestRenderer(unittest.TestCase):
             constants.TANK_DESTROY_ANIMATION_TIME,
         )
 
+    def test_register_destroy_returns_true_on_first_call(self):
+        tank = _fake_tank()
+        self.assertTrue(self.r.register_destroy(tank))
+
+    def test_register_destroy_returns_false_on_repeat(self):
+        tank = _fake_tank()
+        self.r.register_destroy(tank)
+        self.assertFalse(self.r.register_destroy(tank))
+
     def test_register_destroy_idempotent(self):
         tank = _fake_tank()
         self.r.register_destroy(tank)
         count_before = len(self.r.particles.particles)
         self.r.register_destroy(tank)
-        # Second call should not add more particles
         self.assertEqual(len(self.r.particles.particles), count_before)
 
     def test_register_destroy_emits_particles(self):
