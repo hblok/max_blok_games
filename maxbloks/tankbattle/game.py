@@ -71,9 +71,10 @@ class TankBattleGame:
 
     def __init__(self):
         logger.info("TankBattleGame initializing")
+        fullscreen = constants.FULLSCREEN and not compat_sdl.is_anbernic()
         screen, info = compat_sdl.init_display(
             size=(constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT),
-            fullscreen=constants.FULLSCREEN,
+            fullscreen=fullscreen,
             vsync=constants.VSYNC,
         )
         logger.debug("TankBattleGame - pygame.init")
