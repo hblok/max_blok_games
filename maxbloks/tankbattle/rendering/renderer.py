@@ -235,6 +235,7 @@ class Renderer:
             self.particles.emit_smoke(tank.x, tank.y, 1)
 
     def register_destroy(self, tank):
+        """Register tank destruction. Returns True on the first call, False if already registered."""
         key = id(tank)
         if key not in self.destroy_timers:
             self.destroy_timers[key] = constants.TANK_DESTROY_ANIMATION_TIME
@@ -242,6 +243,8 @@ class Renderer:
                                           count=20, speed=120.0, lifetime=0.8)
             self.particles.emit_explosion(tank.x, tank.y, (255, 255, 200),
                                           count=8, speed=60.0, lifetime=0.4)
+            return True
+        return False
 
     def register_hit(self, bullet):
         self.particles.emit_explosion(bullet.x, bullet.y, (255, 255, 150),

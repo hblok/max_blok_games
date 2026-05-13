@@ -30,6 +30,7 @@ from maxbloks.tankbattle import hud
 from maxbloks.tankbattle import input
 from maxbloks.tankbattle import network
 from maxbloks.tankbattle import rendering
+from maxbloks.tankbattle import sound_manager
 from maxbloks.tankbattle import utils
 
 
@@ -112,6 +113,7 @@ class TankBattleGame:
         self.net = network.NetworkManager()
         self.hud = hud.Hud(pygame)
         self.renderer = rendering.Renderer(pygame, self.screen)
+        self.sounds = sound_manager.SoundManager(pygame)
         self.input_reader = input.InputReader(pygame)
 
         # Lobby state
@@ -561,6 +563,7 @@ class TankBattleGame:
                         tank.damage(constants.SUDDEN_DEATH_DAMAGE if self.sudden_death else bullet.damage)
                         bullet.is_alive = False
                         self.renderer.register_hit(bullet)
+                        self.sounds.play_hit()
             if was_alive and not bullet.is_alive and bullet.owner is not None:
                 pass
         for mine in self.mines:
@@ -569,6 +572,7 @@ class TankBattleGame:
             hit_tanks = mine.check_trigger(self.tanks)
             if was_alive and not mine.is_alive:
                 self.renderer.register_mine_explosion(mine)
+                self.sounds.play_mine_explode()
         self.bullets = [bullet for bullet in self.bullets if bullet.is_alive]
         self.mines = [mine for mine in self.mines if mine.is_alive]
 
@@ -582,8 +586,10 @@ class TankBattleGame:
                 was_alive = powerup.is_alive
                 powerup.collect_if_touching(tank)
                 # Track powerup collection for network update
-                if was_alive and not powerup.is_alive and tank is self.local_tank:
-                    self._net_powerup_collected_id = powerup.identifier
+                if was_alive and not powerup.is_alive:
+                    if tank is self.local_tank:
+                        self._net_powerup_collected_id = powerup.identifier
+                    self.sounds.play_powerup()
                     logger.debug(
                         "Network: tracked powerup collection (id=%d, type=%s)",
                         powerup.identifier, powerup.type.value,
@@ -613,6 +619,10 @@ class TankBattleGame:
             self._add_bullet(tank, tank.turret_angle)
         tank.consume_shot()
         self.renderer.register_muzzle_flash(tank)
+        if weapon == entities.WeaponType.ROCKET:
+            self.sounds.play_shoot_rocket()
+        else:
+            self.sounds.play_shoot()
         # Track fired action for network update
         if tank is self.local_tank:
             self._net_fired = True
@@ -629,6 +639,7 @@ class TankBattleGame:
         if tank.active_weapon == entities.WeaponType.MINE_LAYER and tank.can_fire():
             self.mines.append(entities.Mine(tank.x, tank.y, tank))
             tank.consume_shot()
+            self.sounds.play_mine_place()
             # Track mine drop for network update
             if tank is self.local_tank:
                 self._net_mine_dropped = True
@@ -647,7 +658,8 @@ class TankBattleGame:
                 self._finish_round(0 if self.tanks[0].hp > self.tanks[1].hp else 1)
         for tank in self.tanks:
             if not tank.is_alive:
-                self.renderer.register_destroy(tank)
+                if self.renderer.register_destroy(tank):
+                    self.sounds.play_explosion()
         if not self.tanks[0].is_alive:
             self._finish_round(1)
         elif not self.tanks[1].is_alive:
@@ -659,6 +671,7 @@ class TankBattleGame:
             "Round over — player %d wins (score: %d-%d)",
             winner_index + 1, self.round_wins[0], self.round_wins[1],
         )
+        self.sounds.play_round_over()
         self.state = GameState.ROUND_OVER
         self.state_timer = constants.ROUND_OVER_TIME
         if self.round_wins[winner_index] >= constants.ROUNDS_TO_WIN:
@@ -670,6 +683,7 @@ class TankBattleGame:
             self.state = GameState.MATCH_OVER
         else:
             self.reset_round()
+            self.sounds.play_round_start()
             self.state = GameState.COUNTDOWN
             self.state_timer = constants.COUNTDOWN_TIME
 
@@ -677,6 +691,7 @@ class TankBattleGame:
         mode = "single-player" if self.single_player else "multiplayer"
         logger.info("Starting match (%s)", mode)
         self.reset_round()
+        self.sounds.play_round_start()
         self.state = GameState.COUNTDOWN
         self.state_timer = constants.COUNTDOWN_TIME
 
@@ -762,9 +777,11 @@ class TankBattleGame:
                         constants.BULLET_DAMAGE,
                         entities.WeaponType.PRIMARY,
                     )
+                    self.sounds.play_shoot()
                 # Handle dropped mines
                 if packet.mine_dropped:
                     self.mines.append(entities.Mine(packet.mine_x, packet.mine_y, remote_tank))
+                    self.sounds.play_mine_place()
                 # Handle powerup collection
                 if packet.powerup_collected_id >= 0:
                     for powerup in self.powerups:
