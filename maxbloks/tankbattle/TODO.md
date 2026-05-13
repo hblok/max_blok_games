@@ -74,21 +74,21 @@ missed packets).
 - [ ] Client detects divergence beyond a threshold and snaps to host values
 - [ ] Smooth the snap with a short interpolation to avoid visual pop
 
-## 7. Neutral AI tanks ("Wild Tanks") ✅
+## 7. Neutral AI tanks ("Wild Tanks")
 
 Add 1–3 roaming AI-controlled tanks per round that target the nearest human
 player.  Both players must deal with them as shared hazards, adding unpredictable
 tactical pressure and forcing movement.
 
-- [x] Add `is_neutral: bool = False` flag to `Tank`; neutral tanks use `player_id = 0`
-- [x] Generalise `TankAI.update()` to accept a `targets` list; pick the nearest alive target
-- [x] `reset_round()` spawns `NEUTRAL_TANK_COUNT` neutral tanks at random open positions
-- [x] Include neutral tanks in `_resolve_tank_collision()` and `_update_projectiles()`
-- [x] Destroying a neutral tank drops a random power-up at its position
-- [x] Host sends a `neutral_sync` TCP event every 100 ms; client applies positions directly
-- [x] Grey body / yellow turret palette sprite for neutral tanks in `SpriteCache`
-- [x] Add constants: `NEUTRAL_TANK_COUNT = 2`, `NEUTRAL_TANK_HP = 5`, `NEUTRAL_TANK_SYNC_INTERVAL = 0.1`
-- [x] New `test_neutral_tanks.py`: spawn count, AI targeting, collision, HP, destruction, sync event format
+- [ ] Add `is_neutral: bool = False` flag to `Tank`; neutral tanks use `player_id = 0`
+- [ ] Generalise `TankAI.update()` to accept a `targets` list; pick the nearest alive target
+- [ ] `reset_round()` spawns `NEUTRAL_TANK_COUNT` neutral tanks at random open positions
+- [ ] Include neutral tanks in `_resolve_tank_collision()` and `_update_projectiles()`
+- [ ] Destroying a neutral tank drops a random power-up at its position
+- [ ] Host sends a `neutral_sync` TCP event every 100 ms; client applies positions directly
+- [ ] Grey body / yellow turret palette sprite for neutral tanks in `SpriteCache`
+- [ ] Add constants: `NEUTRAL_TANK_COUNT = 2`, `NEUTRAL_TANK_HP = 5`, `NEUTRAL_TANK_SYNC_INTERVAL = 0.1`
+- [ ] New `test_neutral_tanks.py`: spawn count, AI targeting, collision, HP, destruction, sync event format
 
 ## 8. Supply crates (artifacts)
 
