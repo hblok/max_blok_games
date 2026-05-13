@@ -73,3 +73,45 @@ missed packets).
 - [ ] Host sends periodic authoritative snapshots (position, HP, score)
 - [ ] Client detects divergence beyond a threshold and snaps to host values
 - [ ] Smooth the snap with a short interpolation to avoid visual pop
+
+## 7. Neutral AI tanks ("Wild Tanks")
+
+Add 1–3 roaming AI-controlled tanks per round that target the nearest human
+player.  Both players must deal with them as shared hazards, adding unpredictable
+tactical pressure and forcing movement.
+
+- [ ] Add `is_neutral: bool = False` flag to `Tank`; neutral tanks use `player_id = 0`
+- [ ] Generalise `TankAI.update()` to accept a `targets` list; pick the nearest alive target
+- [ ] `reset_round()` spawns `NEUTRAL_TANK_COUNT` neutral tanks at random open positions
+- [ ] Include neutral tanks in `_resolve_tank_collision()` and `_update_projectiles()`
+- [ ] Destroying a neutral tank drops a random power-up at its position
+- [ ] Host sends a `neutral_sync` TCP event every 100 ms; client applies positions directly
+- [ ] Grey body / yellow turret palette sprite for neutral tanks in `SpriteCache`
+- [ ] Add constants: `NEUTRAL_TANK_COUNT = 2`, `NEUTRAL_TANK_HP = 5`, `NEUTRAL_TANK_SYNC_INTERVAL = 0.1`
+- [ ] New `test_neutral_tanks.py`: spawn count, AI targeting, collision, HP, destruction, sync event format
+
+## 8. Supply crates (artifacts)
+
+Destructible wooden crates spawn each round at random positions.  Shoot one open
+(3 hits) to drop a random power-up at its location.  Adds loot-rush decisions
+and denial tactics between the two players.
+
+- [ ] New `Crate` dataclass in `entities.py`: `x, y, hp (3), is_alive, identifier`
+- [ ] `reset_round()` spawns `CRATE_COUNT` crates at random open positions
+- [ ] Bullet–crate collision in `_update_projectiles()`: damage crate; on death spawn a power-up
+- [ ] Host sends `crate_destroyed` reliable TCP event `{id, powerup_type, x, y}`; client spawns power-up
+- [ ] Draw crates between obstacles and power-ups in `draw_world()`; procedural brown box sprite with damage tint
+- [ ] Add constants: `CRATE_COUNT = 4`, `CRATE_HP = 3`, `CRATE_RADIUS = 14.0`
+- [ ] New `test_crates.py`: hit count, death → power-up spawn, network event
+
+## 9. New power-ups: Speed Boost and Shield
+
+Two new collectibles that slot into the existing `PowerUpType` / `Tank.apply_powerup()` system
+with no changes to the UDP network protocol.
+
+- [ ] **Speed Boost** — tank speed ×1.5 for 10 s; `apply_powerup()` sets a speed multiplier;
+      `Tank.update()` reads it; synced automatically via existing weapon/timer UDP fields
+- [ ] **Shield** — absorbs the next 3 hits; add `shield_hp: int = 0` to `Tank`;
+      `Tank.damage()` checks shield first; renderer draws a translucent bubble overlay
+- [ ] Add PNG sprites for both new power-up types (24×24, `powerup_speed_boost.png`, `powerup_shield.png`)
+- [ ] Tests covering both effects, expiry, and interaction with existing damage system
