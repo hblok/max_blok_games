@@ -1,0 +1,13 @@
+[
+  {
+    "id": "dune",
+    "name": "Dune",
+    "description": "Desert survival strategy game",
+    "author": "H. Blok",
+    "version": "{VERSION}",
+    "entryPoint": "maxbloks/dune/main.py",
+    "startScript": "Dune.sh",
+    "icon": "Dune.png",
+    "downloadUrl": "https://github.com/hblok/max_blok_games/releases/download/v{VERSION}-dune/dune-{VERSION}-py3-none-any.whl"
+  }
+]
