@@ -4,8 +4,11 @@
 """Pre-rendered surface cache for TankBattle sprites and tiles."""
 
 import math
+import logging
 import pathlib
 import random
+
+logger = logging.getLogger(__name__)
 
 from maxbloks.tankbattle import constants
 from maxbloks.tankbattle import entities
@@ -36,11 +39,12 @@ class SpriteCache:
     def _load_png(self, filename):
         """Return a converted Surface from assets/sprites/<filename>, or None."""
         path = _SPRITES_DIR / filename
+        logger.debug(f"Loading sprite: {path}")
         if path.is_file():
             try:
                 return self.pygame.image.load(str(path)).convert_alpha()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to load sprit at {path}: {str(e)}")
         return None
 
     # ------------------------------------------------------------------
