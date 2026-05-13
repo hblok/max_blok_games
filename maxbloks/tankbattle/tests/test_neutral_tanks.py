@@ -28,6 +28,7 @@ class _StubGame(gameplay.GameplayMixin, net_handlers.NetworkHandlersMixin):
         self.arena = arena.Arena(0)
         self.bullets = []
         self.mines = []
+        self.turret_bullets = []
         self.powerups = []
         self.powerup_timer = constants.POWERUP_SPAWN_INTERVAL_MIN
         self.powerup_next_id = 1
@@ -114,6 +115,15 @@ class TestNeutralTankAI(unittest.TestCase):
         class _FakeArena:
             def collides_with_solid(self, position, radius):
                 return False
+
+            def terrain_at_world(self, x, y):
+                return None
+
+            def conveyor_at_world(self, x, y):
+                return None
+
+            def teleporter_at_world(self, x, y):
+                return None
 
         class _FakeGame:
             arena = _FakeArena()

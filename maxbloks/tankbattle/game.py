@@ -70,6 +70,7 @@ class TankBattleGame(menu.MenuMixin, gameplay.GameplayMixin, net_handlers.Networ
         self._neutral_sync_timer = 0.0
         self.bullets = []
         self.mines = []
+        self.turret_bullets = []
         self.powerups = []
         self.powerup_next_id = 1
         self.powerup_timer = constants.POWERUP_SPAWN_INTERVAL_MIN
@@ -254,6 +255,7 @@ class TankBattleGame(menu.MenuMixin, gameplay.GameplayMixin, net_handlers.Networ
         if self.single_player:
             self.tank_ai.update(self.tanks[1], [self.tanks[0]], self, dt)
         self._update_neutral_tanks(dt)
+        self._update_hazards(dt)
         self.round_time_remaining -= dt
         for tank in self.tanks:
             tank.update(dt)

@@ -10,6 +10,7 @@ import time
 from maxbloks.tankbattle import arena
 from maxbloks.tankbattle import constants
 from maxbloks.tankbattle import entities
+from maxbloks.tankbattle import hazards
 from maxbloks.tankbattle import utils
 from maxbloks.tankbattle.states import GameState
 
@@ -59,6 +60,39 @@ class GameplayMixin:
         for tank, ai_obj in zip(self.neutral_tanks, self.neutral_ais):
             tank.update(dt)
             ai_obj.update(tank, player_targets, self, dt)
+
+    def _update_hazards(self, dt):
+        """Update all environmental hazards (host or single-player only)."""
+        if not (self.single_player or self.lobby_is_host):
+            return
+
+        # Update landmines
+        for landmine in self.arena.landmines:
+            landmine.update(dt)
+            was_alive = landmine.is_alive
+            hit_tanks = landmine.check_trigger(self.tanks + self.neutral_tanks)
+            if was_alive and not landmine.is_alive:
+                self.renderer.register_mine_explosion(landmine)
+
+        # Update turrets
+        for turret in self.arena.turrets:
+            bullet = turret.update(dt, self.tanks + self.neutral_tanks, self)
+            if bullet is not None:
+                self.turret_bullets.append(bullet)
+
+        # Update turret bullets
+        for bullet in self.turret_bullets:
+            bullet.update(dt, self.arena)
+            for tank in self.tanks + self.neutral_tanks:
+                if tank.is_alive and utils.circles_collide(bullet.position, bullet.radius, tank.position, constants.TANK_HITBOX_RADIUS):
+                    tank.damage(bullet.damage)
+                    bullet.is_alive = False
+                    self.renderer.register_hit(bullet)
+        self.turret_bullets = [b for b in self.turret_bullets if b.is_alive]
+
+        # Update teleporters
+        for teleporter in self.arena.teleporters:
+            teleporter.update(dt)
 
     def _resolve_tank_collision(self):
         """Push overlapping tanks apart so they cannot drive through each other."""
@@ -228,6 +262,7 @@ class GameplayMixin:
         self.tanks[1].reset(constants.SPAWN_TWO_X, constants.SPAWN_TWO_Y, 315.0)
         self.bullets.clear()
         self.mines.clear()
+        self.turret_bullets.clear()
         self.powerups.clear()
         self.round_time_remaining = constants.ROUND_TIME_LIMIT
         self.sudden_death = False

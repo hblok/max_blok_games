@@ -8,6 +8,7 @@ import random
 
 from maxbloks.tankbattle import constants
 from maxbloks.tankbattle import entities
+from maxbloks.tankbattle import hazards
 from maxbloks.tankbattle import utils
 from maxbloks.tankbattle.rendering import particle_system as _particle_system
 from maxbloks.tankbattle.rendering import sprite_cache as _sprite_cache
@@ -54,10 +55,12 @@ class Renderer:
     def draw_world(self, game):
         self.screen.blit(self.terrain_surface, (0, 0))
         camera = game.arena.clamp_camera(game.local_tank.position)
+        self._draw_hazards(game, camera)
         self._draw_obstacles(game, camera)
         self._draw_powerups(game, camera)
         self._draw_mines(game, camera)
         self._draw_bullets(game, camera)
+        self._draw_turret_bullets(game, camera)
         self._draw_tanks(game, camera)
         self.particles.draw(self.screen, camera)
 
@@ -84,6 +87,164 @@ class Renderer:
                     color = constants.COLOR_SOFT
                 self.pygame.draw.rect(self.screen, color,
                                       (int(sx), int(sy), constants.TILE_SIZE, constants.TILE_SIZE))
+
+    def _draw_hazards(self, game, camera):
+        """Draw all environmental hazards on the arena."""
+        arena_obj = game.arena
+        ts = constants.TILE_SIZE
+
+        # Ice patches
+        for ice in arena_obj.ice_patches:
+            wx = ice.tile_x * ts
+            wy = ice.tile_y * ts
+            sx, sy = arena_obj.world_to_screen((wx, wy), camera)
+            if sx + ts < 0 or sx > constants.SCREEN_WIDTH:
+                continue
+            if sy + ts < 0 or sy > constants.SCREEN_HEIGHT:
+                continue
+            tile = self.sprite_cache.get("ice_patch_tile")
+            if tile:
+                self.screen.blit(tile, (int(sx), int(sy)))
+            else:
+                ice_surf = self.pygame.Surface((ts, ts), self.pygame.SRCALPHA)
+                self.pygame.draw.rect(ice_surf, (180, 220, 255, 100), (0, 0, ts, ts))
+                self.pygame.draw.rect(ice_surf, (140, 190, 240, 150), (0, 0, ts, ts), 1)
+                # Shimmer highlights
+                for offset in range(4, ts - 4, 8):
+                    self.pygame.draw.line(ice_surf, (220, 240, 255, 80),
+                                          (offset, 4), (offset + 6, ts - 4), 1)
+                self.screen.blit(ice_surf, (int(sx), int(sy)))
+
+        # Mud swamps
+        for mud in arena_obj.mud_swamps:
+            wx = mud.tile_x * ts
+            wy = mud.tile_y * ts
+            sx, sy = arena_obj.world_to_screen((wx, wy), camera)
+            if sx + ts < 0 or sx > constants.SCREEN_WIDTH:
+                continue
+            if sy + ts < 0 or sy > constants.SCREEN_HEIGHT:
+                continue
+            tile = self.sprite_cache.get("mud_swamp_tile")
+            if tile:
+                self.screen.blit(tile, (int(sx), int(sy)))
+            else:
+                mud_surf = self.pygame.Surface((ts, ts), self.pygame.SRCALPHA)
+                self.pygame.draw.rect(mud_surf, (100, 70, 30, 140), (0, 0, ts, ts))
+                self.pygame.draw.rect(mud_surf, (80, 55, 20, 180), (0, 0, ts, ts), 1)
+                # Bubble details
+                for bx, by in [(8, 8), (20, 16), (12, 24)]:
+                    self.pygame.draw.circle(mud_surf, (120, 90, 40, 160), (bx, by), 3, 1)
+                self.screen.blit(mud_surf, (int(sx), int(sy)))
+
+        # Conveyor belts
+        for conv in arena_obj.conveyor_belts:
+            wx = conv.tile_x * ts
+            wy = conv.tile_y * ts
+            sx, sy = arena_obj.world_to_screen((wx, wy), camera)
+            if sx + ts < 0 or sx > constants.SCREEN_WIDTH:
+                continue
+            if sy + ts < 0 or sy > constants.SCREEN_HEIGHT:
+                continue
+            tile = self.sprite_cache.get("conveyor_belt_tile")
+            if tile:
+                self.screen.blit(tile, (int(sx), int(sy)))
+            else:
+                conv_surf = self.pygame.Surface((ts, ts), self.pygame.SRCALPHA)
+                self.pygame.draw.rect(conv_surf, (80, 80, 90, 130), (0, 0, ts, ts))
+                self.pygame.draw.rect(conv_surf, (60, 60, 70, 180), (0, 0, ts, ts), 1)
+                # Direction arrow
+                cx, cy = ts // 2, ts // 2
+                arrow_dx = conv.direction_x
+                arrow_dy = conv.direction_y
+                # Arrow head
+                tip_x = cx + int(arrow_dx * 10)
+                tip_y = cy + int(arrow_dy * 10)
+                left_x = cx - int(arrow_dy * 5) - int(arrow_dx * 4)
+                left_y = cy + int(arrow_dx * 5) - int(arrow_dy * 4)
+                right_x = cx + int(arrow_dy * 5) - int(arrow_dx * 4)
+                right_y = cy - int(arrow_dx * 5) - int(arrow_dy * 4)
+                self.pygame.draw.polygon(conv_surf, (200, 200, 220, 180),
+                                         [(tip_x, tip_y), (left_x, left_y), (right_x, right_y)])
+                self.screen.blit(conv_surf, (int(sx), int(sy)))
+
+        # Teleporters
+        for tp in arena_obj.teleporters:
+            wx = tp.tile_x * ts
+            wy = tp.tile_y * ts
+            sx, sy = arena_obj.world_to_screen((wx, wy), camera)
+            if sx + ts < 0 or sx > constants.SCREEN_WIDTH:
+                continue
+            if sy + ts < 0 or sy > constants.SCREEN_HEIGHT:
+                continue
+            tile = self.sprite_cache.get("teleporter_tile")
+            if tile:
+                self.screen.blit(tile, (int(sx), int(sy)))
+            else:
+                tp_surf = self.pygame.Surface((ts, ts), self.pygame.SRCALPHA)
+                # Swirling portal effect
+                self.pygame.draw.circle(tp_surf, (120, 50, 200, 100), (ts // 2, ts // 2), 14)
+                self.pygame.draw.circle(tp_surf, (180, 100, 255, 160), (ts // 2, ts // 2), 10)
+                self.pygame.draw.circle(tp_surf, (220, 180, 255, 200), (ts // 2, ts // 2), 5)
+                self.pygame.draw.circle(tp_surf, (100, 40, 180, 220), (ts // 2, ts // 2), 14, 2)
+                self.screen.blit(tp_surf, (int(sx), int(sy)))
+
+        # Landmines (only visible when not hidden in soft obstacles)
+        for landmine in arena_obj.landmines:
+            if not landmine.is_alive:
+                continue
+            # Landmines are hidden inside soft obstacles; only visible once the
+            # obstacle is destroyed
+            key = (landmine.tile_x, landmine.tile_y)
+            obs = arena_obj.obstacle_map.get(key)
+            if obs is not None and not obs.is_destroyed:
+                continue  # Still hidden
+            lmx, lmy = landmine.position
+            sx, sy = arena_obj.world_to_screen((lmx, lmy), camera)
+            isx, isy = int(sx), int(sy)
+            if isx < -20 or isx > constants.SCREEN_WIDTH + 20:
+                continue
+            if isy < -20 or isy > constants.SCREEN_HEIGHT + 20:
+                continue
+            # Draw a small mine marker
+            mine_color = constants.COLOR_RED if landmine.is_armed else constants.COLOR_ORANGE
+            self.pygame.draw.circle(self.screen, mine_color, (isx, isy), 6)
+            self.pygame.draw.circle(self.screen, (200, 200, 200), (isx, isy), 6, 1)
+
+        # Turrets
+        for turret in arena_obj.turrets:
+            if not turret.is_alive:
+                continue
+            twx, twy = turret.position
+            sx, sy = arena_obj.world_to_screen((twx, twy), camera)
+            isx, isy = int(sx), int(sy)
+            if isx < -20 or isx > constants.SCREEN_WIDTH + 20:
+                continue
+            if isy < -20 or isy > constants.SCREEN_HEIGHT + 20:
+                continue
+            tile = self.sprite_cache.get("turret_tile")
+            if tile:
+                self.screen.blit(tile, (isx - tile.get_width() // 2, isy - tile.get_height() // 2))
+            else:
+                # Turret base
+                self.pygame.draw.circle(self.screen, (100, 100, 110), (isx, isy), 12)
+                self.pygame.draw.circle(self.screen, (70, 70, 80), (isx, isy), 12, 2)
+                # Turret barrel (pointing toward nearest tank if alive)
+                self.pygame.draw.circle(self.screen, (140, 60, 60), (isx, isy), 7)
+                self.pygame.draw.circle(self.screen, (180, 80, 80), (isx, isy), 4)
+                # Range indicator
+                range_surf = self.pygame.Surface(
+                    (int(constants.TURRET_ENGAGE_DISTANCE * 2), int(constants.TURRET_ENGAGE_DISTANCE * 2)),
+                    self.pygame.SRCALPHA,
+                )
+                self.pygame.draw.circle(
+                    range_surf, (200, 80, 80, 15),
+                    (int(constants.TURRET_ENGAGE_DISTANCE), int(constants.TURRET_ENGAGE_DISTANCE)),
+                    int(constants.TURRET_ENGAGE_DISTANCE), 1,
+                )
+                self.screen.blit(range_surf, (
+                    isx - int(constants.TURRET_ENGAGE_DISTANCE),
+                    isy - int(constants.TURRET_ENGAGE_DISTANCE),
+                ))
 
     def _draw_powerups(self, game, camera):
         """Draw powerups using pre-computed pulse frames."""
@@ -165,6 +326,18 @@ class Renderer:
                                                isy - surface.get_height() // 2))
                 else:
                     self.pygame.draw.circle(self.screen, constants.COLOR_WHITE, (isx, isy), 3)
+
+    def _draw_turret_bullets(self, game, camera):
+        """Draw turret projectiles."""
+        for bullet in game.turret_bullets:
+            sx, sy = game.arena.world_to_screen(bullet.position, camera)
+            isx, isy = int(sx), int(sy)
+            if isx < -10 or isx > constants.SCREEN_WIDTH + 10:
+                continue
+            if isy < -10 or isy > constants.SCREEN_HEIGHT + 10:
+                continue
+            self.pygame.draw.circle(self.screen, (255, 100, 100), (isx, isy), 3)
+            self.pygame.draw.circle(self.screen, (255, 200, 200), (isx, isy), 1)
 
     def _draw_tanks(self, game, camera):
         for idx, tank in enumerate(game.tanks):
