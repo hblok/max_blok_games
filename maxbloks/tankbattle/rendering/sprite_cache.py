@@ -149,7 +149,7 @@ class SpriteCache:
     # ------------------------------------------------------------------
 
     def _build_tank_surfaces(self):
-        for color_key, base_color in [("green", constants.COLOR_GREEN), ("red", constants.COLOR_RED)]:
+        for color_key, base_color in [("green", constants.COLOR_GREEN), ("red", constants.COLOR_RED), ("neutral", constants.COLOR_NEUTRAL)]:
             loaded = self._load_png(f"tank_{color_key}.png")
             if loaded is not None:
                 self._cache[f"tank_{color_key}"] = loaded
@@ -223,7 +223,7 @@ class SpriteCache:
     # ------------------------------------------------------------------
 
     def _build_turret_surfaces(self):
-        for color_key, base_color in [("green", constants.COLOR_GREEN), ("red", constants.COLOR_RED)]:
+        for color_key, base_color in [("green", constants.COLOR_GREEN), ("red", constants.COLOR_RED), ("neutral", constants.COLOR_YELLOW)]:
             loaded = self._load_png(f"turret_{color_key}.png")
             if loaded is not None:
                 self._cache[f"turret_{color_key}"] = loaded

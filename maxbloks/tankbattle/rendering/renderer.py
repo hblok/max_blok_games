@@ -173,6 +173,11 @@ class Renderer:
                 continue
             color_key = "green" if idx == game.local_player_index else "red"
             self._draw_alive_tank(game, tank, camera, color_key)
+        for tank in game.neutral_tanks:
+            if not tank.is_alive:
+                self._draw_destroyed_tank(game, tank, camera)
+                continue
+            self._draw_alive_tank(game, tank, camera, "neutral")
 
     def _draw_alive_tank(self, game, tank, camera, color_key):
         sx, sy = game.arena.world_to_screen(tank.position, camera)

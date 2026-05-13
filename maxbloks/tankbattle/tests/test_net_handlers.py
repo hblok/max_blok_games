@@ -27,6 +27,8 @@ class _StubGame(net_handlers.NetworkHandlersMixin):
         self.single_player = False
         self.lobby_is_host = False
         self._hp_sync_timer = 0.0
+        self._neutral_sync_timer = 0.0
+        self.neutral_tanks = []
         self._net_fired = False
         self._net_fire_angle = 0.0
         self._net_mine_dropped = False

@@ -39,6 +39,13 @@ py_test(
 )
 
 py_test(
+    name = "test_neutral_tanks",
+    srcs = ["test_neutral_tanks.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
+py_test(
     name = "test_arena",
     srcs = ["test_arena.py"],
     deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],

@@ -51,9 +51,18 @@ class GameplayMixin:
         if input_state.fire_secondary_just_pressed:
             self._drop_mine(tank)
 
+    def _update_neutral_tanks(self, dt):
+        """Update neutral tank physics and AI (host or single-player only)."""
+        if not (self.single_player or self.lobby_is_host):
+            return
+        player_targets = [t for t in self.tanks if t.is_alive]
+        for tank, ai_obj in zip(self.neutral_tanks, self.neutral_ais):
+            tank.update(dt)
+            ai_obj.update(tank, player_targets, self, dt)
+
     def _resolve_tank_collision(self):
         """Push overlapping tanks apart so they cannot drive through each other."""
-        alive_tanks = [t for t in self.tanks if t.is_alive]
+        alive_tanks = [t for t in self.tanks + self.neutral_tanks if t.is_alive]
         for i in range(len(alive_tanks)):
             for j in range(i + 1, len(alive_tanks)):
                 a = alive_tanks[i]
@@ -74,24 +83,30 @@ class GameplayMixin:
 
     def _update_projectiles(self, dt):
         for bullet in self.bullets:
-            was_alive = bullet.is_alive
             bullet.update(dt, self.arena)
-            for tank in self.tanks:
+            for tank in self.tanks + self.neutral_tanks:
                 if tank is not bullet.owner and tank.is_alive:
                     if utils.circles_collide(bullet.position, bullet.radius, tank.position, constants.TANK_HITBOX_RADIUS):
                         tank.damage(constants.SUDDEN_DEATH_DAMAGE if self.sudden_death else bullet.damage)
                         bullet.is_alive = False
                         self.renderer.register_hit(bullet)
-            if was_alive and not bullet.is_alive and bullet.owner is not None:
-                pass
+                        if tank.is_neutral and not tank.is_alive:
+                            self._spawn_powerup_at(tank.x, tank.y)
         for mine in self.mines:
             mine.update(dt)
             was_alive = mine.is_alive
-            mine.check_trigger(self.tanks)
+            mine.check_trigger(self.tanks + self.neutral_tanks)
             if was_alive and not mine.is_alive:
                 self.renderer.register_mine_explosion(mine)
         self.bullets = [bullet for bullet in self.bullets if bullet.is_alive]
         self.mines = [mine for mine in self.mines if mine.is_alive]
+
+    def _spawn_powerup_at(self, x, y):
+        """Spawn a random power-up at the given world position (e.g. on neutral tank death)."""
+        power_type = random.choice(list(entities.PowerUpType))
+        self.powerups.append(entities.PowerUp(x, y, power_type, self.powerup_next_id))
+        logger.debug("Dropped powerup %s (id=%d) at (%.0f, %.0f)", power_type.value, self.powerup_next_id, x, y)
+        self.powerup_next_id += 1
 
     def _update_powerups(self, dt):
         self.powerup_timer -= dt
@@ -225,6 +240,16 @@ class GameplayMixin:
         self._net_mine_x = 0.0
         self._net_mine_y = 0.0
         self._net_powerup_collected_id = -1
+        # Spawn neutral tanks at random open positions
+        self.neutral_tanks.clear()
+        for _ in range(constants.NEUTRAL_TANK_COUNT):
+            x_val, y_val = self.arena.random_open_position()
+            start_angle = float(random.randint(0, 359))
+            neutral = entities.Tank(x_val, y_val, start_angle, start_angle,
+                                    player_id=0, is_neutral=True)
+            neutral.hp = constants.NEUTRAL_TANK_HP
+            self.neutral_tanks.append(neutral)
+        logger.debug("Spawned %d neutral tanks", len(self.neutral_tanks))
 
     def _do_rematch(self):
         """Reset state for a new match, keeping the existing network connection."""

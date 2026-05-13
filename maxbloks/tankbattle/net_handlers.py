@@ -102,6 +102,20 @@ class NetworkHandlersMixin:
         self.remote_tank.x = rx
         self.remote_tank.y = ry
 
+    def _send_neutral_sync(self, dt):
+        """Host sends authoritative neutral tank positions to client every sync interval."""
+        if not self.lobby_is_host:
+            return
+        self._neutral_sync_timer -= dt
+        if self._neutral_sync_timer > 0.0:
+            return
+        self._neutral_sync_timer = constants.NEUTRAL_TANK_SYNC_INTERVAL
+        tanks_data = [
+            [t.x, t.y, t.body_angle, t.turret_angle, t.hp, t.is_alive]
+            for t in self.neutral_tanks
+        ]
+        self.net.send_reliable_event("neutral_sync", {"tanks": tanks_data})
+
     def _send_hp_sync(self, dt):
         """Periodically send authoritative HP snapshot to peer (host only)."""
         if not self.lobby_is_host:
@@ -118,6 +132,17 @@ class NetworkHandlersMixin:
     def _handle_tcp_events_playing(self, events):
         """Process reliable TCP events received during PLAYING state."""
         for event_name, payload in events:
+            if event_name == "neutral_sync" and not self.lobby_is_host:
+                tanks_data = payload.get("tanks", [])
+                for i, data in enumerate(tanks_data):
+                    if i < len(self.neutral_tanks) and len(data) >= 6:
+                        t = self.neutral_tanks[i]
+                        t.x = float(data[0])
+                        t.y = float(data[1])
+                        t.body_angle = float(data[2])
+                        t.turret_angle = float(data[3])
+                        t.hp = int(data[4])
+                        t.is_alive = bool(data[5])
             if event_name == "hp_sync" and not self.lobby_is_host:
                 hp_values = payload.get("hp", [])
                 if len(hp_values) != len(self.tanks):

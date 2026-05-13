@@ -73,6 +73,7 @@ class Tank:
     hit_flash_timer: float = 0.0
     fire_cooldown: float = 0.0
     player_id: int = 1
+    is_neutral: bool = False
 
     @property
     def position(self):
