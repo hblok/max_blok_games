@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 from maxbloks.tankbattle import ai
 from maxbloks.tankbattle import arena
+from maxbloks.common import anbernic
 from maxbloks.tankbattle import compat_sdl
 from maxbloks.tankbattle import constants
 from maxbloks.tankbattle import entities
@@ -71,7 +72,7 @@ class TankBattleGame:
 
     def __init__(self):
         logger.info("TankBattleGame initializing")
-        fullscreen = constants.FULLSCREEN and not compat_sdl.is_anbernic()
+        fullscreen = constants.FULLSCREEN and not anbernic.is_anbernic_device()
         screen, info = compat_sdl.init_display(
             size=(constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT),
             fullscreen=fullscreen,

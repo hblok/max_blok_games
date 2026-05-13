@@ -10,23 +10,6 @@
 import os
 
 
-def is_anbernic():
-    """Return True when running on an Anbernic handheld.
-
-    Checks /proc/device-tree/model and /proc/device-tree/compatible for the
-    string "anbernic" (case-insensitive).  Both files are absent on non-Linux
-    or non-device-tree systems, so the function safely returns False there.
-    """
-    for path in ("/proc/device-tree/model", "/proc/device-tree/compatible"):
-        try:
-            with open(path, "rb") as fh:
-                if b"anbernic" in fh.read().lower():
-                    return True
-        except OSError:
-            pass
-    return False
-
-
 def _try_init_pygame_display(size, fullscreen, allow_software=False):
     """
     Try to initialize pygame.display with requested size.
