@@ -4,7 +4,7 @@
 """Generate pixel-art PNG sprite assets for TankBattle.
 
 Run from the repository root:
-    python tools/generate_sprites.py
+    python maxbloks/tankbattle/tools/generate_sprites.py
 
 Writes PNG files to maxbloks/tankbattle/assets/sprites/.
 SpriteCache loads them at startup; if a file is absent it falls back
@@ -23,7 +23,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame  # noqa: E402  (env vars must be set first)
 
-DEST = pathlib.Path(__file__).parent.parent / "maxbloks" / "tankbattle" / "assets" / "sprites"
+DEST = pathlib.Path(__file__).parent.parent / "assets" / "sprites"
 
 # ---------------------------------------------------------------------------
 # Palette — mirrors constants.py so sprites integrate with the game colours
