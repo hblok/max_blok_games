@@ -168,3 +168,40 @@ and large hits, improving game feel on all platforms.
 - [ ] `ParticleSystem` (or a new `AnimatedEffect` class) plays the strip once on tank death
 - [ ] Procedural fallback: current particle burst if sprite sheet is absent
 - [ ] Tests for frame sequencing and cleanup after animation ends
+
+## 15. Game expansion ideas
+
+Feature concepts to expand the game, optimized for the Anbernic's retro-style
+screen, D-pad, and face buttons.
+
+### 🗺️ Arena & Environmental Hazards
+
+- [ ] **Ice Patches** — Low-friction zones causing tanks to slide and drift
+- [ ] **Mud Swamps** — High-friction terrain that slashes maximum movement speed in half
+- [ ] **Conveyor Belts** — Moving tiles that push tanks or projectiles in specific directions
+- [ ] **Teleporters** — Sci-fi portals linking two distant points on the large 6400×4800 map
+- [ ] **Landmines** — Neutral, pre-placed explosive hazards hidden inside destructible soft obstacles
+- [ ] **Turrets** — Automated neutral defenses shooting at whichever tank gets too close
+
+### 🛡️ Defensive Abilities & Utilities
+
+- [ ] **Smoke Screen** — Drops a cloud blocking enemy vision and minimap tracking
+- [ ] **Energy Shield** — Absorbs one hit from any weapon before breaking entirely
+- [ ] **Dash Booster** — Provides a short, high-speed burst to dodge incoming rockets
+- [ ] **Cloaking Device** — Renders the tank invisible until it fires a weapon
+- [ ] **EMP Blast** — Short-range pulse that freezes the enemy tank's rotation for two seconds
+
+### 🚀 Creative Weapons & Power-Ups
+
+- [ ] **Laser Beam** — Instant hit-scan weapon that cuts through multiple soft obstacles
+- [ ] **Homing Missile** — Slow-moving projectile that tracks the enemy tank's coordinates
+- [ ] **Bouncing Grenade** — Heavy explosive lobbed over hard rock barriers, exploding on impact
+- [ ] **Gravity Well** — Vortex round pulling the enemy tank toward the impact point
+- [ ] **Flame Thrower** — Short-range continuous fire dealing damage over time to targets
+
+### 🕹️ Systems & Match Customisation
+
+- [ ] **Tank Classes** — Selectable chassis variants (e.g., Heavy Armor/Slow vs Light Armor/Fast)
+- [ ] **Perk System** — Choose one passive buff per round, like faster health regeneration
+- [ ] **Fog of War** — Hides the minimap layout until the player explores those coordinates
+- [ ] **Dynamic Events** — Air-drops random tier-three weapons into the center map at 45 seconds
