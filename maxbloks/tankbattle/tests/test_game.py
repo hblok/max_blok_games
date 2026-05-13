@@ -11,6 +11,7 @@ import pygame
 
 from maxbloks.tankbattle import constants
 from maxbloks.tankbattle import game
+from maxbloks.tankbattle import menu
 from maxbloks.tankbattle.input import InputState
 
 
@@ -59,7 +60,7 @@ class TestTankBattleGame(unittest.TestCase):
     # --- _get_wifi_ssid ---
 
     def test_get_wifi_ssid_returns_none_or_string(self):
-        result = game._get_wifi_ssid()
+        result = menu._get_wifi_ssid()
         self.assertIn(type(result), (type(None), str))
 
     # --- start_match / reset_round ---
