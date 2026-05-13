@@ -4,10 +4,13 @@
 """Pre-rendered surface cache for TankBattle sprites and tiles."""
 
 import math
+import pathlib
 import random
 
 from maxbloks.tankbattle import constants
 from maxbloks.tankbattle import entities
+
+_SPRITES_DIR = pathlib.Path(__file__).parent.parent / "assets" / "sprites"
 
 
 class SpriteCache:
@@ -30,11 +33,25 @@ class SpriteCache:
         self._build_ricochet_glow_surface()
         self._build_destroyed_hull_surface()
 
+    def _load_png(self, filename):
+        """Return a converted Surface from assets/sprites/<filename>, or None."""
+        path = _SPRITES_DIR / filename
+        if path.is_file():
+            try:
+                return self.pygame.image.load(str(path)).convert_alpha()
+            except Exception:
+                pass
+        return None
+
     # ------------------------------------------------------------------
     # Tile builders — using batch draw calls instead of per-pixel set_at
     # ------------------------------------------------------------------
 
     def _build_terrain_tile(self):
+        loaded = self._load_png("terrain_tile.png")
+        if loaded is not None:
+            self._cache["terrain_tile"] = loaded
+            return
         size = constants.TILE_SIZE
         tile = self.pygame.Surface((size, size))
         tile.fill(constants.COLOR_BG)
@@ -60,6 +77,10 @@ class SpriteCache:
         self._cache["terrain_tile"] = tile
 
     def _build_hard_rock_tile(self):
+        loaded = self._load_png("hard_rock_tile.png")
+        if loaded is not None:
+            self._cache["hard_rock_tile"] = loaded
+            return
         size = constants.TILE_SIZE
         tile = self.pygame.Surface((size, size))
         tile.fill(constants.COLOR_HARD)
@@ -86,6 +107,10 @@ class SpriteCache:
         self._cache["hard_rock_tile"] = tile
 
     def _build_soft_obstacle_tile(self):
+        loaded = self._load_png("soft_obstacle_tile.png")
+        if loaded is not None:
+            self._cache["soft_obstacle_tile"] = loaded
+            return
         size = constants.TILE_SIZE
         tile = self.pygame.Surface((size, size))
         tile.fill(constants.COLOR_SOFT)
@@ -121,6 +146,11 @@ class SpriteCache:
 
     def _build_tank_surfaces(self):
         for color_key, base_color in [("green", constants.COLOR_GREEN), ("red", constants.COLOR_RED)]:
+            loaded = self._load_png(f"tank_{color_key}.png")
+            if loaded is not None:
+                self._cache[f"tank_{color_key}"] = loaded
+                self._cache[f"tank_{color_key}_size"] = loaded.get_width()
+                continue
             body_w = constants.TANK_BODY_WIDTH
             body_h = constants.TANK_BODY_HEIGHT
             total_size = max(body_w, body_h) + 16
@@ -189,12 +219,11 @@ class SpriteCache:
     # ------------------------------------------------------------------
 
     def _build_turret_surfaces(self):
-        """Pre-render turret surfaces for each tank color.
-
-        These are blitted and rotated each frame, but the base
-        surface is created only once.
-        """
         for color_key, base_color in [("green", constants.COLOR_GREEN), ("red", constants.COLOR_RED)]:
+            loaded = self._load_png(f"turret_{color_key}.png")
+            if loaded is not None:
+                self._cache[f"turret_{color_key}"] = loaded
+                continue
             light_color = tuple(min(255, c + 50) for c in base_color)
             size = 48
             surface = self.pygame.Surface((size, size), self.pygame.SRCALPHA)
@@ -235,6 +264,10 @@ class SpriteCache:
     # ------------------------------------------------------------------
 
     def _build_bullet_surface(self):
+        loaded = self._load_png("bullet.png")
+        if loaded is not None:
+            self._cache["bullet"] = loaded
+            return
         size = 12
         surface = self.pygame.Surface((size, size), self.pygame.SRCALPHA)
         center = size // 2
@@ -243,6 +276,10 @@ class SpriteCache:
         self._cache["bullet"] = surface
 
     def _build_rocket_surface(self):
+        loaded = self._load_png("rocket.png")
+        if loaded is not None:
+            self._cache["rocket"] = loaded
+            return
         size = 16
         surface = self.pygame.Surface((size, size), self.pygame.SRCALPHA)
         center = size // 2
@@ -254,6 +291,12 @@ class SpriteCache:
         self._cache["rocket"] = surface
 
     def _build_mine_surface(self):
+        unarmed = self._load_png("mine_unarmed.png")
+        armed = self._load_png("mine_armed.png")
+        if unarmed is not None and armed is not None:
+            self._cache["mine_unarmed"] = unarmed
+            self._cache["mine_armed"] = armed
+            return
         size = 20
         surface = self.pygame.Surface((size, size), self.pygame.SRCALPHA)
         center = size // 2
@@ -266,13 +309,17 @@ class SpriteCache:
             spike_y = center + int(math.sin(rad) * 9)
             self.pygame.draw.circle(surface, (70, 70, 70), (spike_x, spike_y), 2)
         self._cache["mine_unarmed"] = surface
-        armed = surface.copy()
-        self.pygame.draw.circle(armed, (255, 50, 50), (center, center), 3)
-        self._cache["mine_armed"] = armed
+        armed_surf = surface.copy()
+        self.pygame.draw.circle(armed_surf, (255, 50, 50), (center, center), 3)
+        self._cache["mine_armed"] = armed_surf
 
     def _build_powerup_surfaces(self):
         size = 24
         for power_type in entities.PowerUpType:
+            loaded = self._load_png(f"powerup_{power_type.value}.png")
+            if loaded is not None:
+                self._cache[f"powerup_{power_type.value}"] = loaded
+                continue
             surface = self.pygame.Surface((size, size), self.pygame.SRCALPHA)
             center = size // 2
             if power_type == entities.PowerUpType.HEALTH:
