@@ -18,7 +18,7 @@ All event sites wired in `game.py`. 23 tests in `test_sound_manager.py`.
 ## 2. Manual IP entry (important network fallback)
 
 Multicast discovery is blocked on some WiFi routers. The lobby already shows a
-"Manual IP" menu item but the handler is `pass` (game.py lines 306 and 325).
+"Manual IP" menu item but the handler is `pass` (menu.py line 32).
 
 - [ ] Add `MANUAL_IP` game state (or inline text-input sub-state inside LOBBY)
 - [ ] Render an IP address input field in `renderer.py`
@@ -70,25 +70,26 @@ receiver socket.  24 tests in `test_network_integration.py`.
 Client state can diverge from host over a long match (accumulated float drift,
 missed packets).
 
-- [ ] Host sends periodic authoritative snapshots (position, HP, score)
-- [ ] Client detects divergence beyond a threshold and snaps to host values
-- [ ] Smooth the snap with a short interpolation to avoid visual pop
+- [x] Host sends periodic HP snapshots via `hp_sync` TCP event every `HP_SYNC_INTERVAL = 3 s`
+- [x] Client applies host HP values directly (hard snap) on receiving `hp_sync`
+- [ ] Extend snapshots to include position and score (currently HP only)
+- [ ] Client detects position divergence beyond a threshold before snapping
+- [ ] Smooth the position snap with a short interpolation to avoid visual pop
 
-## 7. Neutral AI tanks ("Wild Tanks")
+## 7. Neutral AI tanks ("Wild Tanks") ✅
 
-Add 1–3 roaming AI-controlled tanks per round that target the nearest human
-player.  Both players must deal with them as shared hazards, adding unpredictable
-tactical pressure and forcing movement.
+1–2 roaming AI-controlled tanks per round that target the nearest human player.
+Both players deal with them as shared hazards.
 
-- [ ] Add `is_neutral: bool = False` flag to `Tank`; neutral tanks use `player_id = 0`
-- [ ] Generalise `TankAI.update()` to accept a `targets` list; pick the nearest alive target
-- [ ] `reset_round()` spawns `NEUTRAL_TANK_COUNT` neutral tanks at random open positions
-- [ ] Include neutral tanks in `_resolve_tank_collision()` and `_update_projectiles()`
-- [ ] Destroying a neutral tank drops a random power-up at its position
-- [ ] Host sends a `neutral_sync` TCP event every 100 ms; client applies positions directly
-- [ ] Grey body / yellow turret palette sprite for neutral tanks in `SpriteCache`
-- [ ] Add constants: `NEUTRAL_TANK_COUNT = 2`, `NEUTRAL_TANK_HP = 5`, `NEUTRAL_TANK_SYNC_INTERVAL = 0.1`
-- [ ] New `test_neutral_tanks.py`: spawn count, AI targeting, collision, HP, destruction, sync event format
+- [x] `is_neutral: bool = False` flag on `Tank`; neutral tanks use `player_id = 0`
+- [x] `TankAI.update()` accepts a `targets` list; picks the nearest alive target
+- [x] `reset_round()` spawns `NEUTRAL_TANK_COUNT` neutral tanks at random open positions
+- [x] Neutral tanks included in `_resolve_tank_collision()` and `_update_projectiles()`
+- [x] Destroying a neutral tank drops a random power-up at its position
+- [x] Host sends `neutral_sync` TCP event every 100 ms; client applies positions directly
+- [x] Grey body / yellow turret palette sprite for neutral tanks in `SpriteCache`
+- [x] Constants: `NEUTRAL_TANK_COUNT = 2`, `NEUTRAL_TANK_HP = 2`, `NEUTRAL_TANK_SYNC_INTERVAL = 0.1`
+- [x] `test_neutral_tanks.py`: spawn count, AI targeting, collision, HP, destruction, sync event (27 tests)
 
 ## 8. Supply crates (artifacts)
 
@@ -115,3 +116,55 @@ with no changes to the UDP network protocol.
       `Tank.damage()` checks shield first; renderer draws a translucent bubble overlay
 - [ ] Add PNG sprites for both new power-up types (24×24, `powerup_speed_boost.png`, `powerup_shield.png`)
 - [ ] Tests covering both effects, expiry, and interaction with existing damage system
+
+## 10. Tank customization (lobby)
+
+Let each player choose their tank's color and a short display name before a match starts.
+Low implementation cost; high two-player personalization payoff.
+
+- [ ] Add `player_name: str` and `color_index: int` to the lobby handshake (`TANKBATTLE_HELLO` payload)
+- [ ] Expose a name-entry + color-picker step in the lobby screen before "Start"
+- [ ] Pass the chosen color to `SpriteCache` so the body tint is applied at render time (no extra PNGs)
+- [ ] Show player name on the HUD next to the HP bar
+- [ ] Test name truncation (max 8 chars) and color index bounds
+
+## 11. Arena variety
+
+Multiple map presets to add replayability.  The host picks a preset; the map seed is
+already shared with the client, so no protocol change is needed.
+
+- [ ] Define 3–4 named `ArenaPreset` entries (e.g. Open Field, Maze, Castle, Bunker) in `constants.py`
+      each with different obstacle density, hard-rock ratio, and soft-rock ratio
+- [ ] Add a preset picker to the host lobby / solo-practice menu
+- [ ] Pass the chosen preset to `Arena.__init__()` alongside the seed
+- [ ] Update `test_arena.py` to cover all presets
+
+## 12. Local high-score / statistics
+
+Persist per-player win counts across sessions to motivate long-term play.
+
+- [ ] Write a `StatsManager` in `stats.py` that loads/saves a JSON file in the user's home dir
+- [ ] Record round wins, match wins, and total kills at match end
+- [ ] Show a "Records" panel on the main menu with top stats
+- [ ] Tests for load, save, missing-file default, and increment logic
+
+## 13. Game modes
+
+Additional round rule sets selectable from the solo/host lobby.
+
+- [ ] **Sudden Death** — one-hit kills; no power-ups; first to 3 wins the match
+- [ ] **King of the Hill** — a central capture zone scores 1 point per second; first to 30 wins
+- [ ] Store the selected mode in `GameState` and branch `_update_playing()` / `_check_round_over()` accordingly
+- [ ] Show the active mode name in the HUD timer area
+- [ ] Host sends chosen mode in `TANKBATTLE_HELLO`; client validates it matches
+
+## 14. Animated explosion sprites
+
+Replace the current particle-only explosions with a sprite-sheet animation for kills
+and large hits, improving game feel on all platforms.
+
+- [ ] Add `explosion_sheet.png` (6-frame strip, 64×64 per frame) to `assets/sprites/`
+- [ ] `SpriteCache` slices the strip and caches frames
+- [ ] `ParticleSystem` (or a new `AnimatedEffect` class) plays the strip once on tank death
+- [ ] Procedural fallback: current particle burst if sprite sheet is absent
+- [ ] Tests for frame sequencing and cleanup after animation ends
