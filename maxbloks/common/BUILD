@@ -3,7 +3,7 @@
 
 py_library(
     name = "common",
-    srcs = ["compat_sdl.py"],
+    srcs = ["compat_sdl.py", "anbernic.py"],
     data = ["version.json"],
     visibility = ["//visibility:public"],
 )
