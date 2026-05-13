@@ -58,6 +58,36 @@ python tools/increment_version.py <game>
 # e.g. python tools/increment_version.py spellwheels
 ```
 
+### Checking test and BUILD coverage
+```bash
+# Report source modules missing a test file, and test files missing a BUILD target
+tools/missing.sh
+```
+
+### Running Bazel tests
+```bash
+# One game
+bazel test //maxbloks/<game>/tests/...
+
+# Whole project
+bazel test //maxbloks/...
+```
+
+## Development Workflow
+
+### Branching
+- Any non-trivial change (new feature, refactor, bug fix that touches more than one file) **must** go on a new git branch and be pushed to GitHub before merging.
+- Very minor fixes (single-line typo fix, constant tweak) may be committed directly to `main`.
+- Branch names should be short and descriptive: `feature-name`, `fix-short-description`.
+
+### Before merging a branch
+1. All `unittest` tests pass: `python -m unittest discover -s maxbloks/<game>/tests`
+2. Every new source module has a test file and a Bazel target — verified with `tools/missing.sh` (no output = clean).
+3. `bazel test //maxbloks/<game>/tests/...` passes.
+4. Security lint is clean: `bandit -c bandit.yaml -r maxbloks/`
+
 ### Claude instructions
-- When running tests or logs, always pipe to head -n 20 or use grep to filter for errors. Do not dump full logs.
+- When running tests or logs, always pipe to `head -n 20` or use grep to filter for errors. Do not dump full logs.
+- When starting work on a non-trivial task, create a new branch first: `git checkout -b <branch-name>`.
+- After implementing a feature or fix, run `tools/missing.sh` and add any missing test files and BUILD targets before committing.
 
