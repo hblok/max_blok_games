@@ -9,6 +9,7 @@ import logging
 import math
 
 from maxbloks.tankbattle import constants
+from maxbloks.tankbattle import hazards
 from maxbloks.tankbattle import utils
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,10 @@ class Tank:
     fire_cooldown: float = 0.0
     player_id: int = 1
     is_neutral: bool = False
+    # Terrain effect state
+    ice_drift_x: float = 0.0
+    ice_drift_y: float = 0.0
+    ice_drift_decay: float = 0.92
 
     @property
     def position(self):
@@ -93,6 +98,8 @@ class Tank:
         self.is_alive = True
         self.hit_flash_timer = 0.0
         self.fire_cooldown = 0.0
+        self.ice_drift_x = 0.0
+        self.ice_drift_y = 0.0
 
     def rotate_body(self, direction, dt):
         """Rotate body by signed direction."""
@@ -113,9 +120,17 @@ class Tank:
         A diagonal boost is applied when both axes are significantly
         deflected, compensating for the reduced magnitude that
         circular stick gates produce on diagonals.
+
+        Terrain modifiers from environmental hazards are applied:
+        - Ice patches reduce friction (tank slides after input stops)
+        - Mud swamps reduce maximum speed
+        - Conveyor belts push the tank in a fixed direction
+        - Teleporters move the tank to the linked position
         """
         magnitude = math.hypot(axis_x, axis_y)
         if magnitude < constants.JOYSTICK_DEADZONE:
+            # Even with no input, apply ice drift and conveyor push
+            self._apply_passive_terrain_effects(dt, arena)
             return
 
         # Apply diagonal sensitivity boost (from reference tanks game)
@@ -132,6 +147,9 @@ class Tank:
         # This prevents full-speed strafing while turning.
         alignment = self._alignment_factor(target_angle)
         self.move(alignment, dt, arena)
+
+        # Apply conveyor and teleporter effects
+        self._apply_passive_terrain_effects(dt, arena)
 
     def _apply_diagonal_boost(self, axis_x, axis_y):
         """Boost diagonal sensitivity to match reference tanks game.
@@ -213,17 +231,90 @@ class Tank:
             self.turret_angle = utils.vector_to_angle(x_value, y_value)
 
     def move(self, forward_amount, dt, arena):
-        """Move forward/backward, reverting if blocked."""
+        """Move forward/backward, reverting if blocked.
+
+        Applies terrain modifiers: mud halves speed, ice enables drift,
+        and conveyor belts push the tank.
+        """
         old_x = self.x
         old_y = self.y
         vx_value, vy_value = utils.angle_to_vector(self.body_angle)
-        self.x += vx_value * self.speed * forward_amount * dt
-        self.y += vy_value * self.speed * forward_amount * dt
+
+        # Determine terrain modifier at current position
+        effective_speed = self.speed
+        terrain = arena.terrain_at_world(self.x, self.y)
+        if terrain == hazards.HazardType.MUD_SWAMP:
+            effective_speed *= constants.MUD_SPEED_MODIFIER
+
+        self.x += vx_value * effective_speed * forward_amount * dt
+        self.y += vy_value * effective_speed * forward_amount * dt
+
+        # Apply ice drift (accumulated from previous frames on ice)
+        self.x += self.ice_drift_x * dt
+        self.y += self.ice_drift_y * dt
+
+        # If on ice, add current movement to drift
+        if terrain == hazards.HazardType.ICE_PATCH:
+            self.ice_drift_x += vx_value * effective_speed * forward_amount * dt * 0.5
+            self.ice_drift_y += vy_value * effective_speed * forward_amount * dt * 0.5
+
+        # Decay ice drift even when not on ice
+        self.ice_drift_x *= self.ice_drift_decay
+        self.ice_drift_y *= self.ice_drift_decay
+        if abs(self.ice_drift_x) < 0.1:
+            self.ice_drift_x = 0.0
+        if abs(self.ice_drift_y) < 0.1:
+            self.ice_drift_y = 0.0
+
+        # Apply conveyor belt push
+        conveyor = arena.conveyor_at_world(self.x, self.y)
+        if conveyor is not None:
+            push_vx, push_vy = conveyor.get_push_velocity()
+            self.x += push_vx * dt
+            self.y += push_vy * dt
+
         self.x = utils.clamp(self.x, constants.TANK_HITBOX_RADIUS, constants.WORLD_WIDTH - constants.TANK_HITBOX_RADIUS)
         self.y = utils.clamp(self.y, constants.TANK_HITBOX_RADIUS, constants.WORLD_HEIGHT - constants.TANK_HITBOX_RADIUS)
         if arena.collides_with_solid(self.position, constants.TANK_COLLISION_RADIUS):
             self.x = old_x
             self.y = old_y
+            # Also reduce drift on collision
+            self.ice_drift_x *= 0.5
+            self.ice_drift_y *= 0.5
+
+    def _apply_passive_terrain_effects(self, dt, arena):
+        """Apply terrain effects that work even with no stick input.
+
+        Handles ice drift decay, conveyor push, and teleporter activation.
+        """
+        # Apply ice drift
+        self.x += self.ice_drift_x * dt
+        self.y += self.ice_drift_y * dt
+        self.ice_drift_x *= self.ice_drift_decay
+        self.ice_drift_y *= self.ice_drift_decay
+        if abs(self.ice_drift_x) < 0.1:
+            self.ice_drift_x = 0.0
+        if abs(self.ice_drift_y) < 0.1:
+            self.ice_drift_y = 0.0
+
+        # Apply conveyor belt push
+        conveyor = arena.conveyor_at_world(self.x, self.y)
+        if conveyor is not None:
+            push_vx, push_vy = conveyor.get_push_velocity()
+            self.x += push_vx * dt
+            self.y += push_vy * dt
+
+        # Check teleporter
+        teleporter = arena.teleporter_at_world(self.x, self.y)
+        if teleporter is not None and teleporter.can_teleport():
+            target_x, target_y = teleporter.target_position
+            self.x = target_x
+            self.y = target_y
+            teleporter.teleport()
+
+        # Clamp to world bounds
+        self.x = utils.clamp(self.x, constants.TANK_HITBOX_RADIUS, constants.WORLD_WIDTH - constants.TANK_HITBOX_RADIUS)
+        self.y = utils.clamp(self.y, constants.TANK_HITBOX_RADIUS, constants.WORLD_HEIGHT - constants.TANK_HITBOX_RADIUS)
 
     def update(self, dt):
         """Advance timers."""

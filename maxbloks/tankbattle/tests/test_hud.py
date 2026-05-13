@@ -28,6 +28,10 @@ class _FakeArena:
     hard_tiles = []
     soft_tiles = []
     obstacle_map = {}
+    ice_patches = []
+    mud_swamps = []
+    teleporters = []
+    turrets = []
 
     def clamp_camera(self, pos):
         return (0.0, 0.0)

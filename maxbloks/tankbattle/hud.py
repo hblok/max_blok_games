@@ -5,6 +5,7 @@
 
 from maxbloks.tankbattle import constants
 from maxbloks.tankbattle import entities
+from maxbloks.tankbattle import hazards
 
 
 class Hud:
@@ -180,6 +181,40 @@ class Hud:
                 y_value = min(y_value, constants.HUD_MINIMAP_HEIGHT - size_y)
                 self.pygame.draw.rect(self.minimap_surface, (100, 75, 50),
                                       (x_value, y_value, size_x, size_y))
+        # Draw ice patches on minimap
+        for ice in game.arena.ice_patches:
+            x_value = int(ice.tile_x * constants.TILE_SIZE * constants.HUD_MINIMAP_SCALE_X)
+            y_value = int(ice.tile_y * constants.TILE_SIZE * constants.HUD_MINIMAP_SCALE_Y)
+            self.minimap_surface.set_at(
+                (max(0, min(x_value, constants.HUD_MINIMAP_WIDTH - 1)),
+                 max(0, min(y_value, constants.HUD_MINIMAP_HEIGHT - 1))),
+                (180, 220, 255),
+            )
+        # Draw mud swamps on minimap
+        for mud in game.arena.mud_swamps:
+            x_value = int(mud.tile_x * constants.TILE_SIZE * constants.HUD_MINIMAP_SCALE_X)
+            y_value = int(mud.tile_y * constants.TILE_SIZE * constants.HUD_MINIMAP_SCALE_Y)
+            self.minimap_surface.set_at(
+                (max(0, min(x_value, constants.HUD_MINIMAP_WIDTH - 1)),
+                 max(0, min(y_value, constants.HUD_MINIMAP_HEIGHT - 1))),
+                (100, 70, 30),
+            )
+        # Draw teleporters on minimap
+        for tp in game.arena.teleporters:
+            x_value = int(tp.tile_x * constants.TILE_SIZE * constants.HUD_MINIMAP_SCALE_X)
+            y_value = int(tp.tile_y * constants.TILE_SIZE * constants.HUD_MINIMAP_SCALE_Y)
+            x_value = max(0, min(x_value, constants.HUD_MINIMAP_WIDTH - 3))
+            y_value = max(0, min(y_value, constants.HUD_MINIMAP_HEIGHT - 3))
+            self.pygame.draw.circle(self.minimap_surface, (180, 100, 255), (x_value, y_value), 2)
+        # Draw turrets on minimap
+        for turret in game.arena.turrets:
+            if not turret.is_alive:
+                continue
+            x_value = int(turret.tile_x * constants.TILE_SIZE * constants.HUD_MINIMAP_SCALE_X)
+            y_value = int(turret.tile_y * constants.TILE_SIZE * constants.HUD_MINIMAP_SCALE_Y)
+            x_value = max(0, min(x_value, constants.HUD_MINIMAP_WIDTH - 3))
+            y_value = max(0, min(y_value, constants.HUD_MINIMAP_HEIGHT - 3))
+            self.pygame.draw.circle(self.minimap_surface, (200, 80, 80), (x_value, y_value), 2)
         for powerup in game.powerups:
             px = int(powerup.x * constants.HUD_MINIMAP_SCALE_X)
             py = int(powerup.y * constants.HUD_MINIMAP_SCALE_Y)

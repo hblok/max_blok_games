@@ -23,6 +23,7 @@ class _StubGame(gameplay.GameplayMixin):
         self.arena = arena.Arena(0)
         self.bullets = []
         self.mines = []
+        self.turret_bullets = []
         self.powerups = []
         self.powerup_timer = 0.0
         self.powerup_next_id = 1

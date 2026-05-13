@@ -16,6 +16,15 @@ class _FakeArena:
     def collides_with_solid(self, position, radius):
         return False
 
+    def terrain_at_world(self, x, y):
+        return None
+
+    def conveyor_at_world(self, x, y):
+        return None
+
+    def teleporter_at_world(self, x, y):
+        return None
+
 
 class _FakeGame:
     """Minimal game stub that captures fire calls."""
