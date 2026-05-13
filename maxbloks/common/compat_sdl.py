@@ -13,26 +13,6 @@ import os
 logger = logging.getLogger(__name__)
 
 
-def hint_audio_driver():
-    """
-    Set SDL_AUDIODRIVER to 'alsa' on Linux if not already configured.
-
-    This is a pure env-var hint — it makes no SDL or pygame calls, so it
-    is safe to call before pygame.init().  On Linux handhelds (Anbernic,
-    TrimUI) the SDL auto-detect often picks the wrong backend; 'alsa' is
-    the reliable choice.  On desktop Linux, ALSA still works via the
-    PulseAudio/PipeWire ALSA compatibility layer.
-
-    Tests and CI that export SDL_AUDIODRIVER=dummy are unaffected because
-    the function returns immediately when the variable is already set.
-    """
-    import platform
-    if os.environ.get("SDL_AUDIODRIVER"):
-        return
-    if platform.system() == "Linux":
-        os.environ["SDL_AUDIODRIVER"] = "alsa"
-        logger.debug("hint_audio_driver: SDL_AUDIODRIVER=alsa")
-
 
 def _try_init_pygame_display(size, fullscreen, allow_software=False):
     """
