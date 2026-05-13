@@ -51,7 +51,7 @@ file is absent — no hard dependency on the assets directory.
 - [x] Mine sprites: `mine_unarmed.png`, `mine_armed.png` (20×20, SRCALPHA)
 - [x] Power-up sprites: one 24×24 PNG per `PowerUpType` value
 - [x] `SpriteCache._load_png()` with disk-first / procedural-fallback pattern
-- [ ] Drop in hand-crafted replacement PNGs to override any sprite without code changes
+- [x] Drop in hand-crafted replacement PNGs to override any sprite without code changes
 
 ## 5. Integration tests ✅
 
