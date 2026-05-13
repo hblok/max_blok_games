@@ -154,8 +154,17 @@ class TestRenderer(unittest.TestCase):
 
     # --- draw_match_over ---
 
+    def _make_match_over_game(self, wins):
+        import time
+        return types.SimpleNamespace(
+            round_wins=wins,
+            single_player=False,
+            _match_over_option=0,
+            _state_entry_time=time.monotonic() - 10.0,
+        )
+
     def test_draw_match_over_player_one_wins(self):
-        self.r.draw_match_over([2, 0])
+        self.r.draw_match_over(self._make_match_over_game([2, 0]))
 
     def test_draw_match_over_player_two_wins(self):
-        self.r.draw_match_over([0, 2])
+        self.r.draw_match_over(self._make_match_over_game([0, 2]))

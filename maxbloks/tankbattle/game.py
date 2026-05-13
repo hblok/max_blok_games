@@ -134,6 +134,10 @@ class TankBattleGame:
         self.lobby_host_select_index = 0
         # Host-authoritative HP sync timer
         self._hp_sync_timer = 0.0
+        # End-screen input gate: records when we entered ROUND_OVER / MATCH_OVER
+        self._state_entry_time = 0.0
+        # Match-over menu: 0 = Play Again, 1 = Return to Menu
+        self._match_over_option = 0
         # Network action tracking: these flags are set during input
         # processing and cleared after the network update is sent
         self._net_fired = False
@@ -453,14 +457,27 @@ class TankBattleGame:
             self.state = GameState.PLAYING
 
     def handle_input_round_over(self, input_state):
-        if input_state.confirm_just_pressed:
+        # Multiplayer: timer-only progression — no button shortcut to avoid
+        # combat-button bleed-through advancing the round immediately.
+        if not self.single_player:
+            return
+        now = time.monotonic()
+        if now - self._state_entry_time < constants.ROUND_END_INPUT_GRACE:
+            return
+        if input_state.pause_just_pressed:
             self._advance_after_round()
 
     def handle_input_match_over(self, input_state):
-        if input_state.confirm_just_pressed:
-            self.round_wins = [0, 0]
-            self.single_player = False
-            self.state = GameState.MENU
+        now = time.monotonic()
+        if now - self._state_entry_time < constants.ROUND_END_INPUT_GRACE:
+            return
+        if input_state.menu_up_just_pressed or input_state.menu_down_just_pressed:
+            self._match_over_option = 1 - self._match_over_option
+        if input_state.pause_just_pressed:
+            if self._match_over_option == 0:
+                self._trigger_rematch()
+            else:
+                self._return_to_menu()
 
     def _apply_tank_input(self, input_state, dt):
         """Apply player input to the local tank.
@@ -540,7 +557,16 @@ class TankBattleGame:
             self._advance_after_round()
 
     def update_match_over(self, dt):
-        pass
+        if self.single_player:
+            return
+        self.state_timer -= dt
+        if self.state_timer <= 0.0:
+            logger.info("Match-over timeout — returning to menu")
+            self._return_to_menu()
+            return
+        events = self.net.process_tcp_messages()
+        self._handle_tcp_events_match_over(events)
+        self.net.send_ping_if_due()
 
     def _resolve_tank_collision(self):
         """Push overlapping tanks apart so they cannot drive through each other."""
@@ -682,15 +708,22 @@ class TankBattleGame:
             winner_index + 1, self.round_wins[0], self.round_wins[1],
         )
         #self.sounds.play_round_over()
-        self.state = GameState.ROUND_OVER
-        self.state_timer = constants.ROUND_OVER_TIME
+        self._state_entry_time = time.monotonic()
         if self.round_wins[winner_index] >= constants.ROUNDS_TO_WIN:
             logger.info("Match over — player %d wins the match", winner_index + 1)
             self.state = GameState.MATCH_OVER
+            self.state_timer = constants.MATCH_OVER_TIMEOUT
+            self._match_over_option = 0
+        else:
+            self.state = GameState.ROUND_OVER
+            self.state_timer = constants.ROUND_OVER_TIME
 
     def _advance_after_round(self):
         if max(self.round_wins) >= constants.ROUNDS_TO_WIN:
+            self._state_entry_time = time.monotonic()
             self.state = GameState.MATCH_OVER
+            self.state_timer = constants.MATCH_OVER_TIMEOUT
+            self._match_over_option = 0
         else:
             self.reset_round()
             #self.sounds.play_round_start()
@@ -854,6 +887,52 @@ class TankBattleGame:
                             )
                             tank.hp = max(0, auth_hp)
 
+    def _do_rematch(self):
+        """Reset state for a new match, keeping the existing network connection."""
+        self.round_wins = [0, 0]
+        self._match_over_option = 0
+        self.reset_round()
+        self.state = GameState.COUNTDOWN
+        self.state_timer = constants.COUNTDOWN_TIME
+        logger.info("Rematch starting")
+
+    def _trigger_rematch(self):
+        """Local player selected 'Play Again'."""
+        if not self.single_player:
+            if self.lobby_is_host:
+                self.match_seed = random.randrange(constants.WORLD_WIDTH * constants.WORLD_HEIGHT)
+                self.arena = arena.Arena(self.match_seed)
+                self.net.send_reliable_event("rematch", {"seed": self.match_seed})
+                logger.info("Host triggered rematch (seed=%d)", self.match_seed)
+            else:
+                self.net.send_reliable_event("rematch", {})
+                logger.info("Client triggered rematch request")
+        self._do_rematch()
+
+    def _return_to_menu(self):
+        """Return to the main menu and reset match state."""
+        self.round_wins = [0, 0]
+        self._match_over_option = 0
+        self.single_player = False
+        self.state = GameState.MENU
+
+    def _handle_tcp_events_match_over(self, events):
+        """Process reliable TCP events received during MATCH_OVER state."""
+        for event_name, payload in events:
+            if event_name == "rematch":
+                seed = payload.get("seed")
+                if seed is not None:
+                    self.match_seed = seed
+                    self.arena = arena.Arena(self.match_seed)
+                    logger.info("Received rematch event (seed=%s)", seed)
+                else:
+                    logger.info("Received rematch request — starting rematch")
+                    if self.lobby_is_host:
+                        self.match_seed = random.randrange(constants.WORLD_WIDTH * constants.WORLD_HEIGHT)
+                        self.arena = arena.Arena(self.match_seed)
+                        self.net.send_reliable_event("rematch", {"seed": self.match_seed})
+                self._do_rematch()
+
     # ------------------------------------------------------------------
     # Drawing
     # ------------------------------------------------------------------
@@ -881,4 +960,4 @@ class TankBattleGame:
         self.renderer.draw_round_over(self)
 
     def draw_match_over(self):
-        self.renderer.draw_match_over(self.round_wins)
+        self.renderer.draw_match_over(self)
