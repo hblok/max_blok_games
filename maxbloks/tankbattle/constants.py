@@ -68,6 +68,8 @@ ROUNDS_TO_WIN = 2
 ROUND_TIME_LIMIT = 90.0
 ROUND_OVER_TIME = 3.0
 COUNTDOWN_TIME = 3.0
+ROUND_END_INPUT_GRACE = 1.0   # seconds after end-screen entry before input is accepted
+MATCH_OVER_TIMEOUT = 30.0     # auto-return to MENU if no action taken
 SUDDEN_DEATH_DAMAGE = 10
 MAX_DT = 0.05
 

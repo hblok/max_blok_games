@@ -5,6 +5,7 @@ import os
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
 os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
 
+import time
 import unittest
 import pygame
 
@@ -227,17 +228,21 @@ class TestTankBattleGame(unittest.TestCase):
         self.g.handle_input_playing(inp)
         self.assertIsNone(self.g.pending_input)
 
-    def test_handle_input_match_over_confirm_returns_to_menu(self):
+    def test_handle_input_match_over_pause_returns_to_menu(self):
         self.g.state = game.GameState.MATCH_OVER
+        self.g._state_entry_time = time.monotonic() - 10.0
+        self.g._match_over_option = 1  # Return to Menu
         inp = InputState()
-        inp.confirm_just_pressed = True
+        inp.pause_just_pressed = True
         self.g.handle_input_match_over(inp)
         self.assertEqual(self.g.state, game.GameState.MENU)
 
-    def test_handle_input_match_over_resets_round_wins(self):
+    def test_handle_input_match_over_pause_resets_round_wins(self):
         self.g.round_wins = [2, 1]
+        self.g._state_entry_time = time.monotonic() - 10.0
+        self.g._match_over_option = 1  # Return to Menu
         inp = InputState()
-        inp.confirm_just_pressed = True
+        inp.pause_just_pressed = True
         self.g.handle_input_match_over(inp)
         self.assertEqual(self.g.round_wins, [0, 0])
 
@@ -335,3 +340,126 @@ class TestTankBattleGame(unittest.TestCase):
         self.g._hp_sync_timer = 99.0
         self.g.reset_round()
         self.assertEqual(self.g._hp_sync_timer, 0.0)
+
+    # --- end-screen input grace period ---
+
+    def test_finish_round_sets_state_entry_time(self):
+        before = time.monotonic()
+        self.g._finish_round(0)
+        self.assertGreaterEqual(self.g._state_entry_time, before)
+
+    def test_finish_round_sets_match_over_timeout_when_match_won(self):
+        self.g.round_wins = [constants.ROUNDS_TO_WIN - 1, 0]
+        self.g._finish_round(0)
+        self.assertEqual(self.g.state, game.GameState.MATCH_OVER)
+        self.assertAlmostEqual(self.g.state_timer, constants.MATCH_OVER_TIMEOUT)
+
+    def test_finish_round_sets_round_over_timer_when_match_continues(self):
+        self.g.round_wins = [0, 0]
+        self.g._finish_round(0)
+        self.assertEqual(self.g.state, game.GameState.ROUND_OVER)
+        self.assertAlmostEqual(self.g.state_timer, constants.ROUND_OVER_TIME)
+
+    # --- handle_input_round_over ---
+
+    def test_handle_input_round_over_ignored_in_multiplayer(self):
+        self.g.single_player = False
+        self.g._state_entry_time = time.monotonic() - 10.0
+        self.g.state = game.GameState.ROUND_OVER
+        inp = InputState()
+        inp.pause_just_pressed = True
+        self.g.handle_input_round_over(inp)
+        self.assertEqual(self.g.state, game.GameState.ROUND_OVER)
+
+    def test_handle_input_round_over_ignored_during_grace_singleplayer(self):
+        self.g.single_player = True
+        self.g._state_entry_time = time.monotonic()  # just entered
+        self.g.state = game.GameState.ROUND_OVER
+        inp = InputState()
+        inp.pause_just_pressed = True
+        self.g.handle_input_round_over(inp)
+        self.assertEqual(self.g.state, game.GameState.ROUND_OVER)
+
+    def test_handle_input_round_over_pause_advances_after_grace_singleplayer(self):
+        self.g.single_player = True
+        self.g._state_entry_time = time.monotonic() - 10.0
+        self.g.state = game.GameState.ROUND_OVER
+        self.g.round_wins = [0, 0]
+        inp = InputState()
+        inp.pause_just_pressed = True
+        self.g.handle_input_round_over(inp)
+        self.assertNotEqual(self.g.state, game.GameState.ROUND_OVER)
+
+    def test_handle_input_round_over_confirm_does_not_advance(self):
+        # confirm (A/fire button) must not advance the round-over screen
+        self.g.single_player = True
+        self.g._state_entry_time = time.monotonic() - 10.0
+        self.g.state = game.GameState.ROUND_OVER
+        inp = InputState()
+        inp.confirm_just_pressed = True
+        self.g.handle_input_round_over(inp)
+        self.assertEqual(self.g.state, game.GameState.ROUND_OVER)
+
+    # --- handle_input_match_over ---
+
+    def test_handle_input_match_over_ignored_during_grace(self):
+        self.g.state = game.GameState.MATCH_OVER
+        self.g._state_entry_time = time.monotonic()  # just entered — still in grace
+        self.g._match_over_option = 1
+        inp = InputState()
+        inp.pause_just_pressed = True
+        self.g.handle_input_match_over(inp)
+        self.assertEqual(self.g.state, game.GameState.MATCH_OVER)
+
+    def test_handle_input_match_over_navigates_option(self):
+        self.g._state_entry_time = time.monotonic() - 10.0
+        self.g._match_over_option = 0
+        inp = InputState()
+        inp.menu_down_just_pressed = True
+        self.g.handle_input_match_over(inp)
+        self.assertEqual(self.g._match_over_option, 1)
+
+    def test_handle_input_match_over_toggles_option(self):
+        self.g._state_entry_time = time.monotonic() - 10.0
+        self.g._match_over_option = 1
+        inp = InputState()
+        inp.menu_up_just_pressed = True
+        self.g.handle_input_match_over(inp)
+        self.assertEqual(self.g._match_over_option, 0)
+
+    def test_handle_input_match_over_return_to_menu(self):
+        self.g._state_entry_time = time.monotonic() - 10.0
+        self.g._match_over_option = 1  # Return to Menu
+        inp = InputState()
+        inp.pause_just_pressed = True
+        self.g.handle_input_match_over(inp)
+        self.assertEqual(self.g.state, game.GameState.MENU)
+
+    def test_handle_input_match_over_confirm_does_not_trigger(self):
+        # confirm (A/fire button) must not dismiss the match-over screen
+        self.g._state_entry_time = time.monotonic() - 10.0
+        self.g._match_over_option = 1
+        self.g.state = game.GameState.MATCH_OVER
+        inp = InputState()
+        inp.confirm_just_pressed = True
+        self.g.handle_input_match_over(inp)
+        self.assertEqual(self.g.state, game.GameState.MATCH_OVER)
+
+    # --- _do_rematch / _return_to_menu ---
+
+    def test_do_rematch_resets_round_wins(self):
+        self.g.round_wins = [2, 1]
+        self.g.single_player = True
+        self.g._do_rematch()
+        self.assertEqual(self.g.round_wins, [0, 0])
+
+    def test_do_rematch_goes_to_countdown(self):
+        self.g.single_player = True
+        self.g._do_rematch()
+        self.assertEqual(self.g.state, game.GameState.COUNTDOWN)
+
+    def test_return_to_menu_clears_wins_and_goes_to_menu(self):
+        self.g.round_wins = [2, 0]
+        self.g._return_to_menu()
+        self.assertEqual(self.g.round_wins, [0, 0])
+        self.assertEqual(self.g.state, game.GameState.MENU)

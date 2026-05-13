@@ -546,6 +546,7 @@ class Renderer:
                                                        constants.SCREEN_HEIGHT // 2 + 25)))
 
     def draw_round_over(self, game):
+        import time as _time
         self.draw_world(game)
         overlay = self.pygame.Surface((constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT),
                                        self.pygame.SRCALPHA)
@@ -556,8 +557,29 @@ class Renderer:
         text_rect = text.get_rect(center=(constants.SCREEN_WIDTH // 2, constants.SCREEN_HEIGHT // 2))
         self.screen.blit(shadow, (text_rect.x + 2, text_rect.y + 2))
         self.screen.blit(text, text_rect)
+        # Countdown hint (single-player only; multiplayer advances on timer)
+        if game.single_player:
+            grace_remaining = constants.ROUND_END_INPUT_GRACE - (
+                _time.monotonic() - game._state_entry_time)
+            if grace_remaining > 0:
+                hint_color = constants.COLOR_GREY
+                hint_text = f"Please wait…"
+            else:
+                hint_color = constants.COLOR_LIGHT_GREY
+                hint_text = "Press [Start] to continue"
+            hint = self.font_small.render(hint_text, True, hint_color)
+            self.screen.blit(hint, hint.get_rect(
+                center=(constants.SCREEN_WIDTH // 2, constants.SCREEN_HEIGHT // 2 + 50)))
+        else:
+            secs_left = max(0, int(game.state_timer) + 1)
+            hint = self.font_small.render(
+                f"Next round in {secs_left}…", True, constants.COLOR_GREY)
+            self.screen.blit(hint, hint.get_rect(
+                center=(constants.SCREEN_WIDTH // 2, constants.SCREEN_HEIGHT // 2 + 50)))
 
-    def draw_match_over(self, wins):
+    def draw_match_over(self, game):
+        import time as _time
+        wins = game.round_wins
         self.screen.fill((15, 15, 25))
         self.pygame.draw.rect(self.screen, (40, 100, 50),
                               (0, 0, constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT), 4)
@@ -565,17 +587,41 @@ class Renderer:
         winner_color = constants.COLOR_GREEN if winner == 1 else constants.COLOR_RED
         title = self.font_big.render("VICTORY!", True, winner_color)
         title_shadow = self.font_big.render("VICTORY!", True, (40, 40, 40))
-        title_rect = title.get_rect(center=(constants.SCREEN_WIDTH // 2, 120))
+        title_rect = title.get_rect(center=(constants.SCREEN_WIDTH // 2, 110))
         self.screen.blit(title_shadow, (title_rect.x + 3, title_rect.y + 3))
         self.screen.blit(title, title_rect)
         message = f"Player {winner} wins the match!"
         text = self.font_menu.render(message, True, constants.COLOR_YELLOW)
-        text_rect = text.get_rect(center=(constants.SCREEN_WIDTH // 2, constants.SCREEN_HEIGHT // 2))
-        self.screen.blit(text, text_rect)
-        score_text = self.font_menu.render(f"{wins[0]}  -  {wins[1]}", True, constants.COLOR_WHITE)
-        score_rect = score_text.get_rect(center=(constants.SCREEN_WIDTH // 2,
-                                                   constants.SCREEN_HEIGHT // 2 + 50))
-        self.screen.blit(score_text, score_rect)
-        hint = self.font_small.render("Press ENTER to return to menu", True, constants.COLOR_GREY)
-        self.screen.blit(hint, hint.get_rect(center=(constants.SCREEN_WIDTH // 2,
-                                                       constants.SCREEN_HEIGHT - 30)))
+        self.screen.blit(text, text.get_rect(
+            center=(constants.SCREEN_WIDTH // 2, 185)))
+        score_text = self.font_menu.render(f"{wins[0]}  —  {wins[1]}", True, constants.COLOR_WHITE)
+        self.screen.blit(score_text, score_text.get_rect(
+            center=(constants.SCREEN_WIDTH // 2, 225)))
+        # Option menu
+        grace_remaining = constants.ROUND_END_INPUT_GRACE - (
+            _time.monotonic() - game._state_entry_time)
+        options = ("Play Again", "Return to Menu")
+        option_y_start = 290
+        option_gap = 38
+        for i, label in enumerate(options):
+            selected = (i == game._match_over_option)
+            if grace_remaining > 0:
+                color = constants.COLOR_GREY
+            elif selected:
+                color = constants.COLOR_GREEN
+            else:
+                color = constants.COLOR_LIGHT_GREY
+            prefix = "► " if selected else "  "
+            opt_surf = self.font_menu.render(prefix + label, True, color)
+            self.screen.blit(opt_surf, opt_surf.get_rect(
+                center=(constants.SCREEN_WIDTH // 2, option_y_start + i * option_gap)))
+        # Hint row
+        if grace_remaining > 0:
+            hint_text = f"Please wait…"
+            hint_color = constants.COLOR_GREY
+        else:
+            hint_text = "↑↓ select   [Start] confirm"
+            hint_color = constants.COLOR_GREY
+        hint = self.font_small.render(hint_text, True, hint_color)
+        self.screen.blit(hint, hint.get_rect(
+            center=(constants.SCREEN_WIDTH // 2, constants.SCREEN_HEIGHT - 30)))
