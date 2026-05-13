@@ -49,10 +49,16 @@ Current `TankAI` only steers, drives, and fires the primary weapon.
 - [ ] Update `SpriteCache` to load from disk when file exists, fall back to
       procedural drawing otherwise (no hard dependency on asset presence)
 
-## 5. Integration tests
+## 5. Integration tests ✅
 
-- [ ] Loopback-socket test: two `NetworkManager` instances exchange a handshake
-- [ ] Loopback-socket test: `PlayerUpdatePacket` round-trip at game cadence
+Uses `socket.socketpair()` (AF_UNIX stream) for TCP — no port binding,
+no loopback timing races.  UDP tested with a single ephemeral-port
+receiver socket.  24 tests in `test_network_integration.py`.
+
+- [x] TCP handshake: `TestTCPHandshake` (6 tests)
+- [x] Reliable events both directions: `TestReliableEvents` (6 tests)
+- [x] `PlayerUpdatePacket` round-trip: `TestUDPPlayerUpdate` (7 tests)
+- [x] `NetworkManager.send_player_update` → `receive_udp`: `TestNetworkManagerUDP` (5 tests)
 - [ ] Keep using `SDL_VIDEODRIVER=dummy` / `SDL_AUDIODRIVER=dummy` pattern
 
 ## 6. Host-authoritative reconciliation (multiplayer correctness)
