@@ -132,6 +132,8 @@ class TankBattleGame:
         self.lobby_handshake_confirmed = {}
         # Selected host index for join lobby navigation
         self.lobby_host_select_index = 0
+        # Host-authoritative HP sync timer
+        self._hp_sync_timer = 0.0
         # Network action tracking: these flags are set during input
         # processing and cleared after the network update is sent
         self._net_fired = False
@@ -504,6 +506,9 @@ class TankBattleGame:
             self.state = GameState.PLAYING
 
     def update_playing(self, dt):
+        # Apply last frame's received remote position (smooth dead reckoning)
+        if not self.single_player:
+            self._apply_dead_reckoning()
         if self.pending_input is not None:
             self._apply_tank_input(self.pending_input, dt)
             self.pending_input = None
@@ -517,13 +522,14 @@ class TankBattleGame:
         self._update_powerups(dt)
         self._check_round_end()
         # Network: send local state, receive all UDP (player updates
-        # + pings) in a single pass, then handle TCP.
+        # + pings) in a single pass, then handle TCP events.
         if not self.single_player:
             self._send_network_update()
             self._receive_network_updates()
             self.net.send_ping_if_due()
-            # Process any TCP messages during gameplay too
-            self.net.process_tcp_messages()
+            events = self.net.process_tcp_messages()
+            self._handle_tcp_events_playing(events)
+            self._send_hp_sync(dt)
 
     def update_paused(self, dt):
         pass
@@ -709,6 +715,8 @@ class TankBattleGame:
         self.powerups.clear()
         self.round_time_remaining = constants.ROUND_TIME_LIMIT
         self.sudden_death = False
+        # Reset HP sync timer so host sends a baseline snapshot at round start
+        self._hp_sync_timer = 0.0
         # Clear network action tracking
         self._net_fired = False
         self._net_fire_angle = 0.0
@@ -796,6 +804,55 @@ class TankBattleGame:
                     "Applied remote update: player=%d, pos=(%.1f,%.1f), hp=%d",
                     packet.player_id, packet.x, packet.y, packet.hp,
                 )
+
+    def _apply_dead_reckoning(self):
+        """Smooth remote tank position using dead-reckoned prediction."""
+        if self.net.dead_reckoner.target_packet is None:
+            return
+        rx, ry = self.net.dead_reckoner.predicted_position()
+        rx = utils.clamp(rx, constants.TANK_HITBOX_RADIUS, constants.WORLD_WIDTH - constants.TANK_HITBOX_RADIUS)
+        ry = utils.clamp(ry, constants.TANK_HITBOX_RADIUS, constants.WORLD_HEIGHT - constants.TANK_HITBOX_RADIUS)
+        self.remote_tank.x = rx
+        self.remote_tank.y = ry
+
+    def _send_hp_sync(self, dt):
+        """Periodically send authoritative HP snapshot to peer (host only)."""
+        if not self.lobby_is_host:
+            return
+        self._hp_sync_timer -= dt
+        if self._hp_sync_timer > 0.0:
+            return
+        self._hp_sync_timer = constants.HP_SYNC_INTERVAL
+        self.net.send_reliable_event("hp_sync", {
+            "hp": [self.tanks[0].hp, self.tanks[1].hp],
+        })
+        logger.debug("Sent HP sync: [%d, %d]", self.tanks[0].hp, self.tanks[1].hp)
+
+    def _handle_tcp_events_playing(self, events):
+        """Process reliable TCP events received during PLAYING state."""
+        for event_name, payload in events:
+            if event_name == "hp_sync" and not self.lobby_is_host:
+                hp_values = payload.get("hp", [])
+                if len(hp_values) != len(self.tanks):
+                    continue
+                for i, tank in enumerate(self.tanks):
+                    auth_hp = int(hp_values[i])
+                    if i == self.local_player_index:
+                        # For our own tank: only apply lower HP to avoid undoing recent damage
+                        if auth_hp < tank.hp:
+                            logger.info(
+                                "HP reconciliation (local tank %d): %d -> %d",
+                                i + 1, tank.hp, auth_hp,
+                            )
+                            tank.hp = max(0, auth_hp)
+                    else:
+                        # For remote tank: trust host's authoritative value
+                        if tank.hp != auth_hp:
+                            logger.info(
+                                "HP reconciliation (remote tank %d): %d -> %d",
+                                i + 1, tank.hp, auth_hp,
+                            )
+                            tank.hp = max(0, auth_hp)
 
     # ------------------------------------------------------------------
     # Drawing

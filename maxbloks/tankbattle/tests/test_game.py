@@ -272,3 +272,66 @@ class TestTankBattleGame(unittest.TestCase):
         self.g._resolve_tank_collision()
         self.assertAlmostEqual(b.x, 400.0)
         self.assertAlmostEqual(b.y, 400.0)
+
+    # --- HP sync / reconciliation ---
+
+    def test_send_hp_sync_skips_when_not_host(self):
+        self.g.lobby_is_host = False
+        self.g._hp_sync_timer = 0.0
+        sent = []
+        self.g.net.send_reliable_event = lambda name, payload=None: sent.append(name)
+        self.g._send_hp_sync(0.1)
+        self.assertEqual(sent, [])
+
+    def test_send_hp_sync_skips_when_timer_positive(self):
+        self.g.lobby_is_host = True
+        self.g._hp_sync_timer = 2.0
+        sent = []
+        self.g.net.send_reliable_event = lambda name, payload=None: sent.append(name)
+        self.g._send_hp_sync(0.1)
+        self.assertEqual(sent, [])
+
+    def test_send_hp_sync_fires_when_timer_expires(self):
+        self.g.lobby_is_host = True
+        self.g._hp_sync_timer = 0.0
+        sent = []
+        self.g.net.send_reliable_event = lambda name, payload=None: sent.append((name, payload))
+        self.g._send_hp_sync(0.1)
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0][0], "hp_sync")
+
+    def test_send_hp_sync_resets_timer(self):
+        self.g.lobby_is_host = True
+        self.g._hp_sync_timer = 0.0
+        self.g.net.send_reliable_event = lambda name, payload=None: None
+        self.g._send_hp_sync(0.1)
+        self.assertGreater(self.g._hp_sync_timer, 0.0)
+
+    def test_handle_tcp_events_playing_corrects_remote_hp(self):
+        self.g.lobby_is_host = False
+        self.g.local_player_index = 1
+        self.g.tanks[0].hp = 100
+        self.g.tanks[1].hp = 100
+        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [60, 100]})])
+        self.assertEqual(self.g.tanks[0].hp, 60)
+
+    def test_handle_tcp_events_playing_local_tank_only_decreases(self):
+        self.g.lobby_is_host = False
+        self.g.local_player_index = 1
+        self.g.tanks[1].hp = 80
+        # Host says local tank HP is 90 (host has stale higher value); should not increase
+        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [100, 90]})])
+        self.assertEqual(self.g.tanks[1].hp, 80)
+
+    def test_handle_tcp_events_playing_ignored_by_host(self):
+        self.g.lobby_is_host = True
+        self.g.tanks[0].hp = 100
+        self.g.tanks[1].hp = 100
+        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [30, 30]})])
+        self.assertEqual(self.g.tanks[0].hp, 100)
+        self.assertEqual(self.g.tanks[1].hp, 100)
+
+    def test_reset_round_resets_hp_sync_timer(self):
+        self.g._hp_sync_timer = 99.0
+        self.g.reset_round()
+        self.assertEqual(self.g._hp_sync_timer, 0.0)

@@ -31,3 +31,23 @@ class TestDeadReckoner(unittest.TestCase):
         x_value, y_value = reckoner.interpolated_position(0.5)
         self.assertEqual(x_value, 50.0)
         self.assertEqual(y_value, 75.0)
+
+    def test_predicted_position_computed_from_consecutive_packets(self):
+        reckoner = network.DeadReckoner()
+        p1 = network.PlayerUpdatePacket(1, 100.0, 100.0, 0.0, 0.0, 10, "primary", 0.0)
+        p2 = network.PlayerUpdatePacket(1, 150.0, 100.0, 0.0, 0.0, 10, "primary", 0.0)
+        reckoner.push_update(p1, now=0.0)
+        reckoner.push_update(p2, now=0.05)
+        # velocity = (150-100)/0.05 = 1000 px/s; extrapolate 0.05s more
+        x_value, y_value = reckoner.predicted_position(now=0.1)
+        self.assertAlmostEqual(x_value, 200.0, delta=1.0)
+        self.assertEqual(y_value, 100.0)
+
+    def test_predicted_position_no_last_packet_velocity_zero(self):
+        reckoner = network.DeadReckoner()
+        p = network.PlayerUpdatePacket(1, 200.0, 300.0, 0.0, 0.0, 10, "primary", 0.0)
+        reckoner.push_update(p, now=0.0)
+        # No previous packet → velocity defaults to packet fields (0)
+        x_value, y_value = reckoner.predicted_position(now=0.05)
+        self.assertEqual(x_value, 200.0)
+        self.assertEqual(y_value, 300.0)
