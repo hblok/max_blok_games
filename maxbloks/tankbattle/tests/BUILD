@@ -4,6 +4,34 @@
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
 py_test(
+    name = "test_states",
+    srcs = ["test_states.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
+py_test(
+    name = "test_menu",
+    srcs = ["test_menu.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
+py_test(
+    name = "test_gameplay",
+    srcs = ["test_gameplay.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
+py_test(
+    name = "test_net_handlers",
+    srcs = ["test_net_handlers.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
+py_test(
     name = "test_ai",
     srcs = ["test_ai.py"],
     deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
