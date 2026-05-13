@@ -11,7 +11,7 @@ py_library(
         "Tankbattle.sh",
         "game.json",
         "version.json",
-    ],
+    ] + glob(["assets/sprites/*.png"]),
     deps = [
         "//maxbloks/common",
         "@games_pip_deps//pygame_ce",
