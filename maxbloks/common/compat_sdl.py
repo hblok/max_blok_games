@@ -7,7 +7,91 @@
 # - Try preferred drivers in order; fall back to default
 # - Respect fullscreen and vsync hints via environment variables
 
+import logging
 import os
+
+logger = logging.getLogger(__name__)
+
+
+def init_audio(frequency=44100, size=-16, channels=2, buffer=1024):
+    """
+    Probe audio drivers and configure pygame mixer before pygame.init().
+    Tries preferred drivers in order; falls back to SDL auto-detect.
+    Sets SDL_AUDIODRIVER to the working driver and calls pre_init() so
+    that the subsequent pygame.init() uses the confirmed settings.
+
+    Must be called BEFORE pygame.init().
+    Returns: info dict {'driver': str, 'enabled': bool}
+    """
+    import pygame
+
+    # Respect an explicit SDL_AUDIODRIVER already in the environment.
+    # This lets tests (SDL_AUDIODRIVER=dummy) and CI runners opt out of
+    # hardware probing without any code changes.
+    existing = os.environ.get("SDL_AUDIODRIVER")
+    if existing:
+        logger.info("init_audio: SDL_AUDIODRIVER already set to '%s', skipping probe", existing)
+        try:
+            pygame.mixer.pre_init(frequency=frequency, size=size, channels=channels, buffer=buffer)
+        except Exception as exc:
+            logger.debug("init_audio: pre_init skipped: %s", exc)
+        return {"driver": existing, "enabled": existing != "dummy"}
+
+    preferred_drivers = [
+        "pulse",     # PulseAudio — common on modern Linux desktops
+        "pipewire",  # PipeWire — replacing PulseAudio on newer distros
+        "alsa",      # Direct ALSA — typical on embedded/handheld Linux
+        "dsp",       # OSS fallback
+    ]
+
+    chosen_driver = None
+
+    for drv in preferred_drivers:
+        os.environ["SDL_AUDIODRIVER"] = drv
+        try:
+            pygame.mixer.init(frequency=frequency, size=size, channels=channels, buffer=buffer)
+            result = pygame.mixer.get_init()
+            pygame.mixer.quit()
+            if result and result != (0, 0, 0):
+                chosen_driver = drv
+                logger.info("init_audio: driver=%s succeeded (%s)", drv, result)
+                break
+        except Exception as exc:
+            logger.debug("init_audio: driver=%s failed: %s", drv, exc)
+            try:
+                pygame.mixer.quit()
+            except Exception:
+                pass
+
+    if chosen_driver is None:
+        try:
+            del os.environ["SDL_AUDIODRIVER"]
+        except KeyError:
+            pass
+        try:
+            pygame.mixer.init(frequency=frequency, size=size, channels=channels, buffer=buffer)
+            result = pygame.mixer.get_init()
+            pygame.mixer.quit()
+            if result and result != (0, 0, 0):
+                chosen_driver = "auto"
+                logger.info("init_audio: auto-detect succeeded (%s)", result)
+        except Exception as exc:
+            logger.warning("init_audio: all drivers failed; last error: %s", exc)
+            try:
+                pygame.mixer.quit()
+            except Exception:
+                pass
+
+    if chosen_driver is not None:
+        # Leave SDL_AUDIODRIVER set so pygame.init() uses the same driver,
+        # and pre-configure the mixer parameters for that pygame.init() call.
+        try:
+            pygame.mixer.pre_init(frequency=frequency, size=size, channels=channels, buffer=buffer)
+        except Exception as exc:
+            logger.debug("init_audio: pre_init failed: %s", exc)
+        return {"driver": chosen_driver, "enabled": True}
+
+    return {"driver": "none", "enabled": False}
 
 
 def _try_init_pygame_display(size, fullscreen, allow_software=False):

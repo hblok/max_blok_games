@@ -52,23 +52,42 @@ class SoundManager:
         if self._enabled:
             self._load_all()
 
+    # Fallback configs tried in order if the mixer isn't already initialized.
+    # compat_sdl.init_audio() normally handles this before pygame.init(),
+    # but these configs serve as a safety net if it wasn't called.
+    _MIXER_FALLBACK_CONFIGS = [
+        (44100, -16, 2, 1024),
+        (22050, -16, 2, 512),
+        (44100, -16, 1, 512),
+    ]
+
     def _init_mixer(self):
-        try:
-            drv = os.environ.get("SDL_AUDIODRIVER", "(auto)")
-            logger.info("SoundManager: SDL_AUDIODRIVER=%s", drv)
-            result = self.pygame.mixer.get_init()
-            logger.info("SoundManager: mixer state before init: %s", result)
-            already_init = result and result != (0, 0, 0)
-            if not already_init:
-                logger.info("SoundManager: calling mixer.init()")
-                self.pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=512)
-            else:
-                logger.info("SoundManager: mixer already initialized, skipping init()")
-            logger.info("SoundManager: mixer state after: %s", self.pygame.mixer.get_init())
+        drv = os.environ.get("SDL_AUDIODRIVER", "(auto)")
+        logger.info("SoundManager: SDL_AUDIODRIVER=%s", drv)
+        result = self.pygame.mixer.get_init()
+        logger.info("SoundManager: mixer state on entry: %s", result)
+
+        if result and result != (0, 0, 0):
+            logger.info("SoundManager: mixer already up (%s)", result)
             self._enabled = True
-            logger.info("SoundManager: audio enabled")
-        except Exception as exc:
-            logger.warning("SoundManager: audio disabled (%s)", exc)
+            return
+
+        for freq, size, channels, buf in self._MIXER_FALLBACK_CONFIGS:
+            try:
+                self.pygame.mixer.init(frequency=freq, size=size, channels=channels, buffer=buf)
+                actual = self.pygame.mixer.get_init()
+                logger.info("SoundManager: mixer init succeeded: %s", actual)
+                self._enabled = True
+                return
+            except Exception as exc:
+                logger.debug("SoundManager: config (%d,%d,%d,%d) failed: %s",
+                             freq, size, channels, buf, exc)
+                try:
+                    self.pygame.mixer.quit()
+                except Exception:
+                    pass
+
+        logger.warning("SoundManager: audio disabled — all configurations failed")
 
     def _load_all(self):
         freq, _size, channels = self.pygame.mixer.get_init()
