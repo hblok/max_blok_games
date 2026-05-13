@@ -159,16 +159,32 @@ Headless pygame is initialised per-file via `SDL_VIDEODRIVER=dummy` / `SDL_AUDIO
 ## Known Limitations and Future Improvements
 
 - Manual IP text entry (fallback when discovery fails) is not yet implemented.
-- Audio playback and sprite asset art are placeholders (`.gitkeep` in `assets/`).
-- Full host-authoritative reconciliation (client correction on divergence) is future work.
-- Integration tests using loopback sockets are future work.
+- Host-authoritative reconciliation covers HP only; position sync and smooth correction are future work.
+- Real OGG sound assets and hand-crafted sprite PNGs are placeholders; procedural fallbacks are active.
+
+## Implemented features
+
+| Feature | Key files | Status |
+|---|---|---|
+| **Neutral AI tanks** | `entities.py`, `ai.py`, `gameplay.py`, `net_handlers.py`, `rendering/` | ✅ 27 tests in `test_neutral_tanks.py` |
+| **Sound manager** | `sound_manager.py` | ✅ 23 tests; OGG + procedural fallback |
+| **Visual sprite assets** | `rendering/sprite_cache.py`, `tools/generate_sprites.py` | ✅ 17 PNGs; disk-first / procedural fallback |
+| **Integration tests** | `tests/test_network_integration.py` | ✅ 24 tests via `socketpair()` |
+| **HP reconciliation** | `net_handlers.py` | ✅ `hp_sync` TCP event every 3 s |
 
 ## Planned features (implementation hooks)
 
-See `TODO.md` §7–9 for the full checklists.
+See `TODO.md` §8–14 for the full checklists.
 
 | Feature | Key files | Notes |
 |---|---|---|
-| **Neutral AI tanks** | `entities.py`, `ai.py`, `gameplay.py`, `net_handlers.py`, `rendering/` | `is_neutral` flag on `Tank`; generalise `TankAI` targets; host-authoritative `neutral_sync` TCP event every 100 ms; grey/yellow sprite palette |
 | **Supply crates** | `entities.py`, `gameplay.py`, `net_handlers.py`, `rendering/` | New `Crate` dataclass; bullet–crate collision in `_update_projectiles()`; `crate_destroyed` reliable TCP event drops a power-up |
 | **Speed Boost / Shield** | `entities.py`, `constants.py`, `rendering/renderer.py` | Slot into existing `PowerUpType` / `Tank.apply_powerup()`; no UDP protocol change needed |
+| **Tank customization** | `menu.py`, `net_handlers.py`, `rendering/renderer.py` | Player name + color index in `TANKBATTLE_HELLO`; tint applied by `SpriteCache` at render time |
+| **Arena variety** | `arena.py`, `constants.py`, `menu.py` | `ArenaPreset` entries with different obstacle densities; host picks preset, seed already shared |
+| **Local high-score** | new `stats.py` | `StatsManager` loads/saves JSON; win counts and kill totals; "Records" panel on main menu |
+| **Game modes** | `gameplay.py`, `constants.py`, `hud.py` | Sudden Death and King of the Hill; mode sent in `TANKBATTLE_HELLO`; branches in `_update_playing()` |
+| **Animated explosions** | `rendering/particle_system.py`, `assets/sprites/` | 6-frame sprite-sheet strip; procedural fallback if absent |
+| **Manual IP entry** | `menu.py`, `states.py`, `rendering/renderer.py` | `MANUAL_IP` state; `KEYDOWN`/`TEXTINPUT` handler; calls `_connect_to_selected_host()` |
+| **AI improvements** | `ai.py`, `constants.py` | Obstacle avoidance, power-up awareness, secondary weapons, difficulty levels |
+| **Full reconciliation** | `net_handlers.py`, `network/dead_reckoner.py` | Extend HP sync to position/score; threshold divergence check; smooth interpolation on snap |
