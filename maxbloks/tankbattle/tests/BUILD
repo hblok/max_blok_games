@@ -1,7 +1,7 @@
 # Copyright (C) 2026 H. Blok
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-load("@rules_python//python:defs.bzl", "py_test")
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
 py_test(
     name = "test_ai",
@@ -105,5 +105,25 @@ py_test(
     name = "test_rendering_sprite_cache",
     srcs = ["test_rendering_sprite_cache.py"],
     deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
+py_test(
+    name = "test_sound_manager",
+    srcs = ["test_sound_manager.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
+py_library(
+    name = "network_test_utils",
+    srcs = ["network_test_utils.py"],
+    deps = ["//maxbloks/tankbattle"],
+)
+
+py_test(
+    name = "test_network_integration",
+    srcs = ["test_network_integration.py"],
+    deps = ["//maxbloks/tankbattle", ":network_test_utils", "@games_pip_deps//pygame_ce"],
     size = "small",
 )
