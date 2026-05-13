@@ -2,19 +2,18 @@
 
 Ordered by gameplay impact. Items marked ✅ are done.
 
-## 1. Sound effects (high impact)
+## 1. Sound effects ✅
 
-`assets/sounds/` is empty; the game runs silently.
+`SoundManager` in `sound_manager.py` synthesizes procedural tones when
+OGG files are absent; loads from `assets/sounds/*.ogg` when present.
+All event sites wired in `game.py`. 23 tests in `test_sound_manager.py`.
 
-- [ ] Add `pygame.mixer` init to `main.py`
-- [ ] Create a `SoundManager` (or add to `Renderer`) that loads OGG/WAV files
-- [ ] Fire sound — primary weapon shot
-- [ ] Explosion sound — bullet/rocket impact
-- [ ] Mine sound — mine placed + mine detonation
-- [ ] Power-up pickup sound
-- [ ] Round-start / round-end jingle
+- [x] `SoundManager` with OGG loading + procedural fallback
+- [x] Shoot (primary + rocket variant), hit, explosion, mine place/explode
+- [x] Power-up pickup, round-start sweep, round-over tone
+- [x] Remote player fire and mine-drop sounds in multiplayer
 - [ ] Optional: low engine hum (looping, positional volume)
-- [ ] Add test smoke-tests for `SoundManager` (dummy driver)
+- [ ] Drop real OGG assets into `assets/sounds/` to replace procedural tones
 
 ## 2. Manual IP entry (important network fallback)
 
