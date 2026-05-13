@@ -78,8 +78,7 @@ class TankBattleGame:
             fullscreen=fullscreen,
             vsync=constants.VSYNC,
         )
-        audio_info = compat_sdl.init_audio()
-        logger.info("audio init: driver=%s enabled=%s", audio_info["driver"], audio_info["enabled"])
+        compat_sdl.hint_audio_driver()
         logger.debug("TankBattleGame - pygame.init")
         success, fail = pygame.init()
         logger.info("pygame.init() success=%d fail=%d", success, fail)
