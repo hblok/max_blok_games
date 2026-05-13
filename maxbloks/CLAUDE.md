@@ -24,6 +24,33 @@
 - Maintain >80% code coverage for math and core modules
 - Use `setUp()` and `tearDown()` for test fixtures
 
+### Every new module needs a test file
+Every new source file must have a corresponding `test_<module>.py` in `<game>/tests/`.
+The only exceptions are modules whitelisted in `tools/missing_tests.py` (`main`, `compat_sdl`, `version`).
+
+Check coverage with:
+```bash
+tools/missing.sh
+```
+No output means all modules are covered and all test files are registered in their BUILD file.
+
+### Every test file must be registered in tests/BUILD
+Add a `py_test` target for each new test file:
+```python
+py_test(
+    name = "test_<module>",
+    srcs = ["test_<module>.py"],
+    deps = ["//maxbloks/<game>", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+```
+
+Then verify:
+```bash
+bazel test //maxbloks/<game>/tests/...
+```
+All targets must pass before a branch is merged.
+
 ## Documentation
 - Docstrings for complex logic only
 - Use single-line docstrings where appropriate
