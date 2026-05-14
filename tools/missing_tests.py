@@ -7,6 +7,7 @@ WHITELIST = [
     "main",
     "compat_sdl",
     "version",
+    "generate_sprites",
 ]
 
 EXCLUDED_GAMES = [
