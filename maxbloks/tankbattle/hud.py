@@ -206,15 +206,16 @@ class Hud:
             x_value = max(0, min(x_value, constants.HUD_MINIMAP_WIDTH - 3))
             y_value = max(0, min(y_value, constants.HUD_MINIMAP_HEIGHT - 3))
             self.pygame.draw.circle(self.minimap_surface, (180, 100, 255), (x_value, y_value), 2)
-        # Draw turrets on minimap
+        # Draw turrets on minimap (larger marker to distinguish from mines)
         for turret in game.arena.turrets:
             if not turret.is_alive:
                 continue
             x_value = int(turret.tile_x * constants.TILE_SIZE * constants.HUD_MINIMAP_SCALE_X)
             y_value = int(turret.tile_y * constants.TILE_SIZE * constants.HUD_MINIMAP_SCALE_Y)
-            x_value = max(0, min(x_value, constants.HUD_MINIMAP_WIDTH - 3))
-            y_value = max(0, min(y_value, constants.HUD_MINIMAP_HEIGHT - 3))
-            self.pygame.draw.circle(self.minimap_surface, (200, 80, 80), (x_value, y_value), 2)
+            x_value = max(0, min(x_value, constants.HUD_MINIMAP_WIDTH - 4))
+            y_value = max(0, min(y_value, constants.HUD_MINIMAP_HEIGHT - 4))
+            self.pygame.draw.circle(self.minimap_surface, (220, 90, 90), (x_value, y_value), 3)
+            self.pygame.draw.circle(self.minimap_surface, (180, 60, 60), (x_value, y_value), 3, 1)
         for powerup in game.powerups:
             px = int(powerup.x * constants.HUD_MINIMAP_SCALE_X)
             py = int(powerup.y * constants.HUD_MINIMAP_SCALE_Y)

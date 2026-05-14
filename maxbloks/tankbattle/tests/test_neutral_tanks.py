@@ -154,10 +154,13 @@ class TestNeutralTankAI(unittest.TestCase):
         self.assertEqual(self.ai_tank.x, prev_x)
 
     def test_ai_selects_nearer_of_two_targets(self):
-        # Place AI between two targets; near_target is 10 units away, far_target 400
-        # After an update, AI should steer toward near_target direction
-        self.near_target.x = 510.0  # east, 10 units away
+        # Place AI between two targets; near_target is 200 units east (outside
+        # retreat distance of 120), far_target is 400 units west.
+        # After an update, AI should steer toward near_target direction.
+        self.near_target.x = 700.0  # east, 200 units away — outside retreat range
+        self.near_target.y = 500.0
         self.far_target.x = 100.0   # west, 400 units away
+        self.far_target.y = 500.0
         self.ai_tank.body_angle = 0.0
         self.ai_obj.update(self.ai_tank, [self.near_target, self.far_target], self.game, 0.5)
         # After steering toward east (near_target), body_angle should be closer to 90 than 270

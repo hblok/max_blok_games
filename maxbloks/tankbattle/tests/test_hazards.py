@@ -239,6 +239,48 @@ class TestTurret(unittest.TestCase):
         result = t.update(0.1, [tank], None)
         self.assertIsNone(result)
 
+    def test_turret_default_hp(self):
+        t = hazards.Turret(10, 20)
+        self.assertEqual(t.hp, constants.TURRET_HP)
+
+    def test_turret_damage_reduces_hp(self):
+        t = hazards.Turret(10, 20)
+        t.take_damage(5)
+        self.assertEqual(t.hp, constants.TURRET_HP - 5)
+        self.assertTrue(t.is_alive)
+
+    def test_turret_destroyed_at_zero_hp(self):
+        t = hazards.Turret(10, 20)
+        t.take_damage(constants.TURRET_HP)
+        self.assertEqual(t.hp, 0)
+        self.assertFalse(t.is_alive)
+
+    def test_turret_damage_does_not_go_below_zero(self):
+        t = hazards.Turret(10, 20)
+        t.take_damage(constants.TURRET_HP + 10)
+        self.assertEqual(t.hp, 0)
+        self.assertFalse(t.is_alive)
+
+    def test_turret_damage_ignored_when_dead(self):
+        t = hazards.Turret(10, 20)
+        t.take_damage(constants.TURRET_HP)
+        self.assertFalse(t.is_alive)
+        # Damage again should not error
+        t.take_damage(5)
+        self.assertEqual(t.hp, 0)
+
+    def test_turret_requires_multiple_hits(self):
+        """Turrets should survive several standard bullet hits."""
+        t = hazards.Turret(10, 20)
+        # Standard bullet damage is 1
+        for _ in range(constants.TURRET_HP - 1):
+            t.take_damage(1)
+        self.assertTrue(t.is_alive)
+        self.assertEqual(t.hp, 1)
+        # One more hit destroys it
+        t.take_damage(1)
+        self.assertFalse(t.is_alive)
+
 
 class TestTurretBullet(unittest.TestCase):
 
@@ -337,6 +379,42 @@ class TestArenaHazardGeneration(unittest.TestCase):
                     break
             self.assertTrue(found_partner, f"Teleporter at ({tp.tile_x}, {tp.tile_y}) has no partner")
 
+    def test_ice_patches_form_clusters(self):
+        """Ice patches should appear in clusters, not all isolated."""
+        world = arena.Arena(42)
+        if len(world.ice_patches) < 3:
+            return  # Not enough patches to test clustering
+        # Check that some ice tiles have at least one adjacent ice tile
+        ice_set = world.ice_tiles
+        clustered = 0
+        for tx, ty in ice_set:
+            has_neighbor = any(
+                (tx + dx, ty + dy) in ice_set
+                for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]
+            )
+            if has_neighbor:
+                clustered += 1
+        # At least half the ice tiles should be adjacent to another
+        self.assertGreater(clustered, len(ice_set) * 0.3,
+                           "Expected more clustered ice patches")
+
+    def test_mud_swamps_form_clusters(self):
+        """Mud swamps should appear in clusters, not all isolated."""
+        world = arena.Arena(42)
+        if len(world.mud_swamps) < 3:
+            return
+        mud_set = world.mud_tiles
+        clustered = 0
+        for tx, ty in mud_set:
+            has_neighbor = any(
+                (tx + dx, ty + dy) in mud_set
+                for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]
+            )
+            if has_neighbor:
+                clustered += 1
+        self.assertGreater(clustered, len(mud_set) * 0.3,
+                           "Expected more clustered mud swamps")
+
 
 class TestArenaHazardSerialization(unittest.TestCase):
 
@@ -360,6 +438,16 @@ class TestArenaHazardSerialization(unittest.TestCase):
         self.assertEqual(len(restored.teleporters), len(world.teleporters))
         self.assertEqual(len(restored.landmines), len(world.landmines))
         self.assertEqual(len(restored.turrets), len(world.turrets))
+
+    def test_deserialize_turret_hp(self):
+        world = arena.Arena(42)
+        # Damage a turret before serializing
+        if world.turrets:
+            world.turrets[0].take_damage(5)
+        data = world.serialize()
+        restored = arena.Arena.deserialize(data)
+        for orig, rest in zip(world.turrets, restored.turrets):
+            self.assertEqual(orig.hp, rest.hp)
 
     def test_deserialize_ice_patch_positions(self):
         world = arena.Arena(42)
@@ -404,10 +492,12 @@ class TestArenaHazardReset(unittest.TestCase):
         for turret in world.turrets:
             turret.fire_cooldown = 99.0
             turret.is_alive = False
+            turret.hp = 0
         world.reset_round()
         for turret in world.turrets:
             self.assertTrue(turret.is_alive)
             self.assertAlmostEqual(turret.fire_cooldown, 0.0)
+            self.assertEqual(turret.hp, constants.TURRET_HP)
 
     def test_reset_round_resets_teleporters(self):
         world = arena.Arena(42)

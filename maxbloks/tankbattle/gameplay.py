@@ -126,6 +126,17 @@ class GameplayMixin:
                         self.renderer.register_hit(bullet)
                         if tank.is_neutral and not tank.is_alive:
                             self._spawn_powerup_at(tank.x, tank.y)
+            # Check bullet-turret collisions (turrets can be destroyed by tank fire)
+            if bullet.is_alive:
+                for turret in self.arena.turrets:
+                    if turret.is_alive:
+                        twx, twy = turret.position
+                        turret_radius = constants.TILE_SIZE * 0.6  # Approximate turret hitbox
+                        if utils.circles_collide(bullet.position, bullet.radius, (twx, twy), turret_radius):
+                            turret.take_damage(bullet.damage)
+                            bullet.is_alive = False
+                            self.renderer.register_hit(bullet)
+                            break
         for mine in self.mines:
             mine.update(dt)
             was_alive = mine.is_alive

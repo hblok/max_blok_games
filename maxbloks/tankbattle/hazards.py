@@ -208,12 +208,22 @@ class Turret:
     fire_interval: float = 1.5
     damage: int = 2
     bullet_speed: float = 200.0
+    hp: int = constants.TURRET_HP
     is_alive: bool = True
 
     @property
     def position(self):
         """Return world position."""
         return utils.tile_to_world(self.tile_x, self.tile_y)
+
+    def take_damage(self, amount):
+        """Apply damage to the turret; destroys it when HP reaches zero."""
+        if not self.is_alive:
+            return
+        self.hp = max(0, self.hp - amount)
+        if self.hp <= 0:
+            self.is_alive = False
+            logger.debug("Turret at (%d, %d) destroyed", self.tile_x, self.tile_y)
 
     def update(self, dt, tanks, game):
         """Update turret logic and fire at nearby tanks."""
