@@ -19,7 +19,9 @@ def _fake_bullet(x=100.0, y=100.0, weapon=entities.WeaponType.PRIMARY):
 
 
 def _fake_mine(x=200.0, y=200.0):
-    return types.SimpleNamespace(x=x, y=y)
+    mine = types.SimpleNamespace(x=x, y=y)
+    mine.position = (x, y)
+    return mine
 
 
 def _fake_tank(x=320.0, y=240.0, turret_angle=0.0):

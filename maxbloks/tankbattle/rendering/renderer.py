@@ -467,9 +467,10 @@ class Renderer:
                                       count=5, speed=40.0, lifetime=0.2)
 
     def register_mine_explosion(self, mine):
-        self.particles.emit_explosion(mine.x, mine.y, constants.COLOR_ORANGE,
+        mx, my = mine.position
+        self.particles.emit_explosion(mx, my, constants.COLOR_ORANGE,
                                       count=15, speed=100.0, lifetime=0.6)
-        self.particles.emit_explosion(mine.x, mine.y, (100, 100, 100),
+        self.particles.emit_explosion(mx, my, (100, 100, 100),
                                       count=8, speed=50.0, lifetime=0.8)
 
     def register_muzzle_flash(self, tank):
