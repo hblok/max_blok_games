@@ -42,6 +42,7 @@ class _StubGame(gameplay.GameplayMixin):
         self._net_mine_y = 0.0
         self._net_powerup_collected_id = -1
         self._hp_sync_timer = 0.0
+        self._round_seq = 0
         self.match_seed = 0
         self.neutral_tanks = []
         self.neutral_ais = []
@@ -225,6 +226,11 @@ class TestGameplayMixin(unittest.TestCase):
         self.g._hp_sync_timer = 99.0
         self.g.reset_round()
         self.assertEqual(self.g._hp_sync_timer, 0.0)
+
+    def test_reset_round_increments_round_seq(self):
+        seq_before = self.g._round_seq
+        self.g.reset_round()
+        self.assertEqual(self.g._round_seq, seq_before + 1)
 
     def test_reset_round_clears_net_flags(self):
         self.g._net_fired = True

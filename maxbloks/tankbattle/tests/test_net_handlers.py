@@ -27,6 +27,7 @@ class _StubGame(net_handlers.NetworkHandlersMixin):
         self.single_player = False
         self.lobby_is_host = False
         self._hp_sync_timer = 0.0
+        self._round_seq = 0
         self._neutral_sync_timer = 0.0
         self.neutral_tanks = []
         self._net_fired = False
@@ -118,23 +119,105 @@ class TestNetworkHandlersMixin(unittest.TestCase):
     def test_handle_tcp_events_playing_ignored_by_host(self):
         self.g.lobby_is_host = True
         self.g.tanks[0].hp = 10
-        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [5, 10]})])
+        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [5, 10], "seq": self.g._round_seq})])
         self.assertEqual(self.g.tanks[0].hp, 10)
 
     def test_handle_tcp_events_playing_corrects_remote_hp(self):
         self.g.lobby_is_host = False
         self.g.local_player_index = 0
         self.g.tanks[1].hp = 10
-        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [10, 6]})])
+        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [10, 6], "seq": self.g._round_seq})])
         self.assertEqual(self.g.tanks[1].hp, 6)
 
     def test_handle_tcp_events_playing_local_tank_only_decreases(self):
         self.g.lobby_is_host = False
         self.g.local_player_index = 0
         self.g.tanks[0].hp = 5
-        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [10, 10]})])
+        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [10, 10], "seq": self.g._round_seq})])
         # Auth HP is higher than current; should NOT increase
         self.assertEqual(self.g.tanks[0].hp, 5)
+
+
+    # --- Round sequence (stale message protection) ---
+
+    def test_stale_hp_sync_ignored_after_round_reset(self):
+        """Stale hp_sync from a previous round must not corrupt reset HP."""
+        self.g.lobby_is_host = False
+        self.g.local_player_index = 0
+        # Simulate round 1: client dies (hp=0)
+        self.g.tanks[0].hp = 0
+        # Round resets: _round_seq increments, HP restored
+        self.g._round_seq = 2
+        self.g.tanks[0].hp = constants.TANK_MAX_HP
+        self.g.tanks[1].hp = constants.TANK_MAX_HP
+        # Late-arriving hp_sync from round 1 (seq=1) arrives in round 2
+        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [0, 10], "seq": 1})])
+        # Client HP must NOT be lowered to 0 by the stale message
+        self.assertEqual(self.g.tanks[0].hp, constants.TANK_MAX_HP)
+
+    def test_current_round_hp_sync_is_applied(self):
+        """hp_sync from the current round must still be applied."""
+        self.g.lobby_is_host = False
+        self.g.local_player_index = 0
+        self.g._round_seq = 2
+        self.g.tanks[1].hp = 10
+        # hp_sync from the current round
+        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [10, 6], "seq": 2})])
+        self.assertEqual(self.g.tanks[1].hp, 6)
+
+    def test_stale_neutral_sync_ignored_after_round_reset(self):
+        """Stale neutral_sync from a previous round must be ignored."""
+        self.g.lobby_is_host = False
+        # Create a neutral tank
+        self.g.neutral_tanks = [entities.Tank(500.0, 500.0, player_id=0, is_neutral=True)]
+        self.g.neutral_tanks[0].hp = 5
+        # Round 2
+        self.g._round_seq = 2
+        # Late-arriving neutral_sync from round 1 (seq=1)
+        payload = {"tanks": [[999.0, 888.0, 45.0, 90.0, 3, True]], "seq": 1}
+        self.g._handle_tcp_events_playing([("neutral_sync", payload)])
+        # Neutral tank position must NOT be overwritten
+        self.assertAlmostEqual(self.g.neutral_tanks[0].x, 500.0)
+
+    def test_send_hp_sync_includes_round_seq(self):
+        """hp_sync payload must include the current round sequence number."""
+        self.g.lobby_is_host = True
+        self.g._hp_sync_timer = 0.0
+        self.g._round_seq = 7
+        self.g._send_hp_sync(0.1)
+        self.assertEqual(self.g._reliable_events_sent[0][1]["seq"], 7)
+
+    def test_send_neutral_sync_includes_round_seq(self):
+        """neutral_sync payload must include the current round sequence number."""
+        self.g.lobby_is_host = True
+        self.g._neutral_sync_timer = 0.0
+        self.g._round_seq = 5
+        self.g.neutral_tanks = [entities.Tank(500.0, 500.0, player_id=0, is_neutral=True)]
+        self.g._send_neutral_sync(0.1)
+        self.assertEqual(self.g._reliable_events_sent[0][1]["seq"], 5)
+
+    def test_stale_udp_packet_ignored_after_round_reset(self):
+        """Stale UDP packet from a previous round must not corrupt tank HP."""
+        from maxbloks.tankbattle.network.packet import PlayerUpdatePacket
+        self.g.local_player_index = 0
+        # Round 2
+        self.g._round_seq = 2
+        self.g.tanks[1].hp = constants.TANK_MAX_HP
+        # Simulate receiving a stale UDP packet from round 1
+        stale_pkt = PlayerUpdatePacket(
+            2, 500.0, 500.0, 0.0, 0.0, 0, "primary", 0.0, round_seq=1,
+        )
+        # Override receive_udp to return the stale packet
+        self.g.net = types.SimpleNamespace(
+            should_send_update=lambda now: False,
+            send_player_update=lambda pkt: None,
+            receive_udp=lambda: [stale_pkt],
+            dead_reckoner=dead_reckoner.DeadReckoner(),
+            send_reliable_event=lambda name, payload=None: self.g._reliable_events_sent.append((name, payload)),
+        )
+        self.g._receive_network_updates()
+        # HP must NOT be set to 0 from the stale packet
+        self.assertEqual(self.g.tanks[1].hp, constants.TANK_MAX_HP)
 
     # --- _handle_tcp_events_match_over ---
 

@@ -268,6 +268,7 @@ class GameplayMixin:
 
     def reset_round(self):
         logger.debug("Resetting round state")
+        self._round_seq += 1
         self.arena.reset_round()
         self.tanks[0].reset(constants.SPAWN_ONE_X, constants.SPAWN_ONE_Y, 135.0)
         self.tanks[1].reset(constants.SPAWN_TWO_X, constants.SPAWN_TWO_Y, 315.0)
