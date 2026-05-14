@@ -150,6 +150,27 @@ py_test(
     size = "small",
 )
 
+py_test(
+    name = "test_hazards",
+    srcs = ["test_hazards.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
+py_test(
+    name = "test_anbernic",
+    srcs = ["test_anbernic.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
+py_test(
+    name = "test_constants",
+    srcs = ["test_constants.py"],
+    deps = ["//maxbloks/tankbattle", "@games_pip_deps//pygame_ce"],
+    size = "small",
+)
+
 py_library(
     name = "network_test_utils",
     srcs = ["network_test_utils.py"],
