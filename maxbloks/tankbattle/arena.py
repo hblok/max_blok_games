@@ -70,7 +70,7 @@ class Arena:
                 for h in self.teleporters
             ],
             "landmines": [{"tx": h.tile_x, "ty": h.tile_y} for h in self.landmines],
-            "turrets": [{"tx": h.tile_x, "ty": h.tile_y} for h in self.turrets],
+            "turrets": [{"tx": h.tile_x, "ty": h.tile_y, "hp": h.hp} for h in self.turrets],
         }
         logger.info(
             "Arena serialised: seed=%d, %d obstacles, %d hazards",
@@ -158,7 +158,7 @@ class Arena:
 
         # Deserialize turrets
         for entry in data.get("turrets", []):
-            t = hazards.Turret(entry["tx"], entry["ty"])
+            t = hazards.Turret(entry["tx"], entry["ty"], hp=entry.get("hp", constants.TURRET_HP))
             arena_obj.turrets.append(t)
 
         logger.info(
@@ -255,34 +255,82 @@ class Arena:
     # ------------------------------------------------------------------
 
     def _generate_ice_patches(self, blocked):
+        """Generate ice patches as natural-looking clusters.
+
+        Instead of scattering individual tiles, we plant cluster seeds
+        and grow each outward with a random walk.  This produces larger
+        lumps with organic edges while still allowing occasional single
+        tiles for variety.
+        """
         target_ratio = self.random.uniform(constants.ICE_PATCH_RATIO_MIN, constants.ICE_PATCH_RATIO_MAX)
         target_count = int(constants.WORLD_TILES_X * constants.WORLD_TILES_Y * target_ratio)
+        cluster_min = constants.ICE_CLUSTER_MIN_SIZE
+        cluster_max = constants.ICE_CLUSTER_MAX_SIZE
         attempts = 0
         max_attempts = target_count * 10
         while len(self.ice_patches) < target_count and attempts < max_attempts:
             attempts += 1
             tile_x = self.random.randrange(constants.WORLD_TILES_X)
             tile_y = self.random.randrange(constants.WORLD_TILES_Y)
-            candidate = (tile_x, tile_y)
-            if candidate not in blocked and candidate not in self.ice_tiles:
-                ice = hazards.IcePatch(tile_x, tile_y)
-                self.ice_patches.append(ice)
-                self.ice_tiles.add(candidate)
+            seed = (tile_x, tile_y)
+            if seed in blocked or seed in self.ice_tiles:
+                continue
+            # Decide cluster size for this seed
+            cluster_size = self.random.randint(cluster_min, cluster_max)
+            self._grow_hazard_cluster(
+                tile_x, tile_y, cluster_size, blocked, self.ice_tiles,
+                self.ice_patches, hazards.IcePatch,
+            )
 
     def _generate_mud_swamps(self, blocked):
+        """Generate mud swamps as natural-looking clusters.
+
+        Same cluster-growth algorithm as ice patches for consistent
+        organic-looking terrain lumps.
+        """
         target_ratio = self.random.uniform(constants.MUD_SWAMP_RATIO_MIN, constants.MUD_SWAMP_RATIO_MAX)
         target_count = int(constants.WORLD_TILES_X * constants.WORLD_TILES_Y * target_ratio)
+        cluster_min = constants.MUD_CLUSTER_MIN_SIZE
+        cluster_max = constants.MUD_CLUSTER_MAX_SIZE
         attempts = 0
         max_attempts = target_count * 10
         while len(self.mud_swamps) < target_count and attempts < max_attempts:
             attempts += 1
             tile_x = self.random.randrange(constants.WORLD_TILES_X)
             tile_y = self.random.randrange(constants.WORLD_TILES_Y)
-            candidate = (tile_x, tile_y)
-            if candidate not in blocked and candidate not in self.mud_tiles:
-                mud = hazards.MudSwamp(tile_x, tile_y)
-                self.mud_swamps.append(mud)
-                self.mud_tiles.add(candidate)
+            seed = (tile_x, tile_y)
+            if seed in blocked or seed in self.mud_tiles:
+                continue
+            cluster_size = self.random.randint(cluster_min, cluster_max)
+            self._grow_hazard_cluster(
+                tile_x, tile_y, cluster_size, blocked, self.mud_tiles,
+                self.mud_swamps, hazards.MudSwamp,
+            )
+
+    def _grow_hazard_cluster(self, start_x, start_y, cluster_size, blocked, tile_set, hazard_list, hazard_class):
+        """Grow a cluster of terrain tiles outward from a seed using a random walk.
+
+        Places the seed tile, then takes random cardinal steps, adding
+        adjacent tiles until the desired cluster size is reached or no
+        valid expansion directions remain.  This produces organic lumps
+        with occasional tendrils rather than perfect rectangles.
+        """
+        cx, cy = start_x, start_y
+        placed = 0
+        for _ in range(cluster_size * 3):  # Extra iterations for walk back-tracking
+            if placed >= cluster_size:
+                break
+            candidate = (cx, cy)
+            if self._in_bounds_tile(cx, cy) and candidate not in blocked and candidate not in tile_set:
+                hazard = hazard_class(cx, cy)
+                hazard_list.append(hazard)
+                tile_set.add(candidate)
+                placed += 1
+            # Random cardinal step for next position
+            dx, dy = self.random.choice([(0, 1), (0, -1), (1, 0), (-1, 0)])
+            cx += dx
+            cy += dy
+        # If we couldn't place the seed at all, that's fine — just skip
 
     def _generate_conveyor_belts(self, blocked):
         count = self.random.randint(constants.CONVEYOR_BELT_COUNT_MIN, constants.CONVEYOR_BELT_COUNT_MAX)
@@ -408,6 +456,7 @@ class Arena:
         # Reset turrets
         for turret in self.turrets:
             turret.is_alive = True
+            turret.hp = constants.TURRET_HP
             turret.fire_cooldown = 0.0
         # Reset teleporters
         for teleporter in self.teleporters:

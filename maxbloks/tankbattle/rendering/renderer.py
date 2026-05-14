@@ -217,20 +217,58 @@ class Renderer:
             twx, twy = turret.position
             sx, sy = arena_obj.world_to_screen((twx, twy), camera)
             isx, isy = int(sx), int(sy)
-            if isx < -20 or isx > constants.SCREEN_WIDTH + 20:
+            if isx < -40 or isx > constants.SCREEN_WIDTH + 40:
                 continue
-            if isy < -20 or isy > constants.SCREEN_HEIGHT + 20:
+            if isy < -40 or isy > constants.SCREEN_HEIGHT + 40:
                 continue
             tile = self.sprite_cache.get("turret_tile")
             if tile:
                 self.screen.blit(tile, (isx - tile.get_width() // 2, isy - tile.get_height() // 2))
             else:
-                # Turret base
-                self.pygame.draw.circle(self.screen, (100, 100, 110), (isx, isy), 12)
-                self.pygame.draw.circle(self.screen, (70, 70, 80), (isx, isy), 12, 2)
-                # Turret barrel (pointing toward nearest tank if alive)
-                self.pygame.draw.circle(self.screen, (140, 60, 60), (isx, isy), 7)
-                self.pygame.draw.circle(self.screen, (180, 80, 80), (isx, isy), 4)
+                # Fortified base platform (bigger octagonal shape)
+                base_r = 16
+                octagon_points = []
+                for i in range(8):
+                    angle = math.radians(i * 45 + 22.5)
+                    octagon_points.append((
+                        isx + int(base_r * math.cos(angle)),
+                        isy + int(base_r * math.sin(angle)),
+                    ))
+                self.pygame.draw.polygon(self.screen, (80, 80, 90), octagon_points)
+                self.pygame.draw.polygon(self.screen, (55, 55, 65), octagon_points, 2)
+                # Inner armoured ring
+                self.pygame.draw.circle(self.screen, (95, 95, 105), (isx, isy), 11)
+                self.pygame.draw.circle(self.screen, (65, 65, 75), (isx, isy), 11, 2)
+                # Barrel pointing toward nearest tank
+                barrel_dx, barrel_dy = 0.0, -1.0  # Default north
+                alive_tanks = [t for t in getattr(game, "tanks", []) + getattr(game, "neutral_tanks", []) if t.is_alive]
+                if alive_tanks:
+                    nearest = min(alive_tanks, key=lambda t: utils.distance((twx, twy), t.position))
+                    ddx = nearest.x - twx
+                    ddy = nearest.y - twy
+                    dd = math.hypot(ddx, ddy)
+                    if dd > 0:
+                        barrel_dx, barrel_dy = ddx / dd, ddy / dd
+                barrel_len = 18
+                barrel_end_x = isx + int(barrel_dx * barrel_len)
+                barrel_end_y = isy + int(barrel_dy * barrel_len)
+                self.pygame.draw.line(self.screen, (50, 50, 55), (isx, isy), (barrel_end_x, barrel_end_y), 5)
+                self.pygame.draw.line(self.screen, (90, 90, 100), (isx, isy), (barrel_end_x, barrel_end_y), 3)
+                # Muzzle flash dot
+                self.pygame.draw.circle(self.screen, (200, 100, 80), (barrel_end_x, barrel_end_y), 3)
+                # Centre hub
+                self.pygame.draw.circle(self.screen, (120, 60, 60), (isx, isy), 5)
+                self.pygame.draw.circle(self.screen, (160, 80, 70), (isx, isy), 3)
+                # HP bar above turret
+                hp_ratio = turret.hp / constants.TURRET_HP
+                bar_w, bar_h = 24, 4
+                bar_x = isx - bar_w // 2
+                bar_y = isy - base_r - 8
+                self.pygame.draw.rect(self.screen, (40, 40, 40), (bar_x - 1, bar_y - 1, bar_w + 2, bar_h + 2))
+                self.pygame.draw.rect(self.screen, (60, 60, 60), (bar_x, bar_y, bar_w, bar_h))
+                if hp_ratio > 0:
+                    hp_color = (int(220 * (1 - hp_ratio)), int(200 * hp_ratio), 40)
+                    self.pygame.draw.rect(self.screen, hp_color, (bar_x, bar_y, int(bar_w * hp_ratio), bar_h))
                 # Range indicator
                 range_surf = self.pygame.Surface(
                     (int(constants.TURRET_ENGAGE_DISTANCE * 2), int(constants.TURRET_ENGAGE_DISTANCE * 2)),
