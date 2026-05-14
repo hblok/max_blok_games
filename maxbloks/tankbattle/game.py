@@ -94,6 +94,7 @@ class TankBattleGame(menu.MenuMixin, gameplay.GameplayMixin, net_handlers.Networ
         self.lobby_host_select_index = 0
         # Host-authoritative HP sync timer
         self._hp_sync_timer = 0.0
+        self._round_seq = 0
         # End-screen input gate: records when we entered ROUND_OVER / MATCH_OVER
         self._state_entry_time = 0.0
         # Match-over menu: 0 = Play Again, 1 = Return to Menu

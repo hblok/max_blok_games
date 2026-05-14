@@ -318,7 +318,7 @@ class TestTankBattleGame(unittest.TestCase):
         self.g.local_player_index = 1
         self.g.tanks[0].hp = 100
         self.g.tanks[1].hp = 100
-        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [60, 100]})])
+        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [60, 100], "seq": self.g._round_seq})])
         self.assertEqual(self.g.tanks[0].hp, 60)
 
     def test_handle_tcp_events_playing_local_tank_only_decreases(self):
@@ -326,14 +326,14 @@ class TestTankBattleGame(unittest.TestCase):
         self.g.local_player_index = 1
         self.g.tanks[1].hp = 80
         # Host says local tank HP is 90 (host has stale higher value); should not increase
-        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [100, 90]})])
+        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [100, 90], "seq": self.g._round_seq})])
         self.assertEqual(self.g.tanks[1].hp, 80)
 
     def test_handle_tcp_events_playing_ignored_by_host(self):
         self.g.lobby_is_host = True
         self.g.tanks[0].hp = 100
         self.g.tanks[1].hp = 100
-        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [30, 30]})])
+        self.g._handle_tcp_events_playing([("hp_sync", {"hp": [30, 30], "seq": self.g._round_seq})])
         self.assertEqual(self.g.tanks[0].hp, 100)
         self.assertEqual(self.g.tanks[1].hp, 100)
 

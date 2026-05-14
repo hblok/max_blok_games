@@ -31,6 +31,7 @@ class PlayerUpdatePacket:
     mine_x: float = 0.0
     mine_y: float = 0.0
     powerup_collected_id: int = -1
+    round_seq: int = 0
 
 
 class PacketCodec:
@@ -59,6 +60,7 @@ class PacketCodec:
             round(packet.mine_x, 2),
             round(packet.mine_y, 2),
             packet.powerup_collected_id,
+            packet.round_seq,
         ]
         return json.dumps(values, separators=(",", ":")).encode("utf-8")
 
@@ -87,6 +89,7 @@ class PacketCodec:
             values[16],
             values[17],
             values[18],
+            round_seq=values[19] if len(values) > 19 else 0,
         )
 
     @staticmethod

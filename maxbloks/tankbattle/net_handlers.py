@@ -41,6 +41,7 @@ class NetworkHandlersMixin:
             mine_x=self._net_mine_x,
             mine_y=self._net_mine_y,
             powerup_collected_id=self._net_powerup_collected_id,
+            round_seq=self._round_seq,
         )
         self.net.send_player_update(packet)
         # Clear action tracking flags after sending
@@ -64,6 +65,13 @@ class NetworkHandlersMixin:
             # Find the remote tank (player_id is 1-indexed)
             remote_idx = packet.player_id - 1
             if 0 <= remote_idx < len(self.tanks):
+                # Ignore stale packets from a previous round
+                if packet.round_seq < self._round_seq:
+                    logger.debug(
+                        "Ignoring stale UDP packet (seq=%d, current=%d)",
+                        packet.round_seq, self._round_seq,
+                    )
+                    continue
                 remote_tank = self.tanks[remote_idx]
                 remote_tank.x = packet.x
                 remote_tank.y = packet.y
@@ -114,7 +122,7 @@ class NetworkHandlersMixin:
             [t.x, t.y, t.body_angle, t.turret_angle, t.hp, t.is_alive]
             for t in self.neutral_tanks
         ]
-        self.net.send_reliable_event("neutral_sync", {"tanks": tanks_data})
+        self.net.send_reliable_event("neutral_sync", {"tanks": tanks_data, "seq": self._round_seq})
 
     def _send_hp_sync(self, dt):
         """Periodically send authoritative HP snapshot to peer (host only)."""
@@ -126,6 +134,7 @@ class NetworkHandlersMixin:
         self._hp_sync_timer = constants.HP_SYNC_INTERVAL
         self.net.send_reliable_event("hp_sync", {
             "hp": [self.tanks[0].hp, self.tanks[1].hp],
+            "seq": self._round_seq,
         })
         logger.debug("Sent HP sync: [%d, %d]", self.tanks[0].hp, self.tanks[1].hp)
 
@@ -133,6 +142,14 @@ class NetworkHandlersMixin:
         """Process reliable TCP events received during PLAYING state."""
         for event_name, payload in events:
             if event_name == "neutral_sync" and not self.lobby_is_host:
+                # Ignore stale neutral sync from a previous round
+                msg_seq = payload.get("seq", 0)
+                if msg_seq < self._round_seq:
+                    logger.debug(
+                        "Ignoring stale neutral_sync (seq=%d, current=%d)",
+                        msg_seq, self._round_seq,
+                    )
+                    continue
                 tanks_data = payload.get("tanks", [])
                 for i, data in enumerate(tanks_data):
                     if i < len(self.neutral_tanks) and len(data) >= 6:
@@ -144,6 +161,14 @@ class NetworkHandlersMixin:
                         t.hp = int(data[4])
                         t.is_alive = bool(data[5])
             if event_name == "hp_sync" and not self.lobby_is_host:
+                # Ignore stale HP sync from a previous round
+                msg_seq = payload.get("seq", 0)
+                if msg_seq < self._round_seq:
+                    logger.debug(
+                        "Ignoring stale hp_sync (seq=%d, current=%d)",
+                        msg_seq, self._round_seq,
+                    )
+                    continue
                 hp_values = payload.get("hp", [])
                 if len(hp_values) != len(self.tanks):
                     continue
