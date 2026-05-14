@@ -48,6 +48,7 @@ class _StubGame(gameplay.GameplayMixin, net_handlers.NetworkHandlersMixin):
         self._net_mine_y = 0.0
         self._net_powerup_collected_id = -1
         self._hp_sync_timer = 0.0
+        self._round_seq = 0
         self._neutral_sync_timer = 0.0
         self.match_seed = 0
         self.neutral_tanks = []
@@ -278,7 +279,7 @@ class TestNeutralTankNetworkSync(unittest.TestCase):
     def test_handle_tcp_neutral_sync_applies_to_client(self):
         self.g.lobby_is_host = False
         t = self.g.neutral_tanks[0]
-        payload = {"tanks": [[999.0, 888.0, 45.0, 90.0, 3, True]]}
+        payload = {"tanks": [[999.0, 888.0, 45.0, 90.0, 3, True]], "seq": self.g._round_seq}
         self.g._handle_tcp_events_playing([("neutral_sync", payload)])
         self.assertAlmostEqual(t.x, 999.0)
         self.assertAlmostEqual(t.y, 888.0)
@@ -288,13 +289,13 @@ class TestNeutralTankNetworkSync(unittest.TestCase):
         self.g.lobby_is_host = True
         t = self.g.neutral_tanks[0]
         original_x = t.x
-        payload = {"tanks": [[999.0, 888.0, 45.0, 90.0, 3, True]]}
+        payload = {"tanks": [[999.0, 888.0, 45.0, 90.0, 3, True]], "seq": self.g._round_seq}
         self.g._handle_tcp_events_playing([("neutral_sync", payload)])
         self.assertEqual(t.x, original_x)
 
     def test_handle_tcp_neutral_sync_safe_with_empty_list(self):
         self.g.lobby_is_host = False
-        self.g._handle_tcp_events_playing([("neutral_sync", {"tanks": []})])
+        self.g._handle_tcp_events_playing([("neutral_sync", {"tanks": [], "seq": self.g._round_seq})])
 
 
 class TestUpdateNeutralTanks(unittest.TestCase):
