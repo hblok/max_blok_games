@@ -28,3 +28,9 @@ no build
 
 ## 9
 commit and push
+
+## 10
+the rendering is very nice, however, the ship is somewhat uninspring. Can we make it more ominous - a ship from centuries ago, with an imposing precense.
+
+## 11
+commit and push
