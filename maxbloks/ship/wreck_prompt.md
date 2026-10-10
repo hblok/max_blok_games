@@ -1,6 +1,6 @@
 # Ship wreck SVG: drawing prompt
 
-Draft v2. Describes what to draw and how. Edit this file, then render.
+Draft v3. Describes what to draw and how. Edit this file, then render.
 
 ## Decisions
 - Canvas: 1200x800.
@@ -22,7 +22,7 @@ Draft v2. Describes what to draw and how. Edit this file, then render.
 - Avoid: faces or eyes on fish/crabs, smiles, googly eyes, sparkles/stars, rainbow colours, thick black outlines, clip-art look.
 
 ## Scene
-An old wooden three-masted sailing ship, broken and half buried on a sandy seabed, seen from the side in shallow, clear water. Late afternoon sunlight falls from the upper left through the surface. Mood: quiet, ancient, slightly eerie but not scary.
+A 17th-century war galleon, centuries on the seabed: huge, dark and broken, but still imposing. Seen from the side and slightly from below, so it towers over the viewer. Late afternoon sunlight falls from the upper left through the surface, but the wreck sits mostly in its own shadow; only its top edges catch a cold rim of light. Mood: ominous, ancient, heavy silence. Something you do not swim into. Ominous through scale, silhouette and darkness, never through cheap horror props (no skulls, ghosts or faces).
 
 ## Layers (back to front)
 
@@ -30,20 +30,24 @@ An old wooden three-masted sailing ship, broken and half buried on a sandy seabe
 2. **Light shafts** (`#rays`): 5 to 7 translucent white wedges from the top-left surface down to the seabed, opacity 0.08 to 0.18, Gaussian blur ~6. Surface edge at the top: a wavy lighter band.
 3. **Distant seabed** (`#far-sand`): low dunes, desaturated blue-green, low contrast, faded as if by distance. A few far rock silhouettes.
 4. **Seabed** (`#sand`): warm sand `#c9b27c` darkening to `#6e6244` at the edges. Ripple lines (thin, slightly curved, low opacity). Patches of darker sediment near the hull.
-5. **Hull** (`#hull`), the focal point, about 55% of the width, centered slightly right, sitting in the bottom third (top of the hull no higher than y≈540):
-   - Tilted about 15 degrees, bow raised on the left, stern sunk deeper in the sand on the right.
-   - Planking: dark brown `#4a3320`, with horizontal plank seams as thin darker lines and uneven plank colour variation.
-   - A large jagged break amidships: ribs (curved timbers) exposed like a rib cage, 8 to 10 ribs, some snapped.
-   - Missing planks near the keel, showing dark interior. Keel visible as a thick beam at the bottom.
-   - Row of 4 small gun ports on the intact side, some with open hatches hanging.
-   - Green algae and brown weed stains on the lower half; white barnacle dots clustered along the waterline of the wreck.
+5. **Hull** (`#hull`), the focal point, about 65% of the width, centered slightly right:
+   - Galleon profile: low forecastle and beakhead at the bow (left), a long waist, then a towering stern castle (quarterdeck + poop deck) on the right, the highest part of the ship.
+   - Tilted ~7 degrees the other way than v2: bow nosed down and buried in a sand mound, stern rearing up and resting on a rock outcrop. The stern castle is the dominant shape.
+   - Planking: dark, cold-tinted wood (`#3a2c22` to `#5a4632`), plank seams, butt joints, and a thick wale along each gun deck.
+   - Two gun decks: a lower row and an upper row of gun ports. Most lids gone, a few hanging; a few cannon muzzles still poking out.
+   - Quarter gallery on the stern castle: a bay with tall arched windows, the glass long gone, black inside.
+   - Tarnished, once-gilded carved trim along the rails and around the gallery (dull ochre, barely readable).
+   - A broken stern lantern hanging askew from its bracket at the very top of the stern.
+   - Beakhead at the bow with a weathered, eroded figurehead stub (no recognisable face) and a snapped bowsprit.
+   - A large jagged break amidships: ribs exposed like a rib cage, some snapped, a deck beam visible inside.
+   - Faint eerie inner glow: a very low-opacity cold teal-green glow inside the break, a few gun ports and the gallery windows. Barely there, felt more than seen.
+   - Weathering: heavy algae on the lower hull, barnacle clusters, long dark weed strands draping down from the rails.
 6. **Masts and rigging** (`#masts`):
-   - Masts are short broken stumps so they stay out of the play area: nothing rises above y≈380, and anything above y≈540 is drawn in the hazy distance tone.
-   - Main mast snapped at about one third height, splintered top.
-   - Foremast leaning at ~35 degrees, a yard arm still attached.
-   - Mizzen mast missing; only a stump.
-   - Torn sail remnants: a few pale, ragged cloth shapes drifting in the current, semi-transparent, with holes.
-   - Ropes: thin curved dark lines sagging from the masts, some ending loose and floating.
+   - Main mast still stands, slightly leaning back, snapped at the top, with its fighting top (round platform) intact: the tallest silhouette in the image.
+   - Foremast broken and leaning far forward; mizzen snapped, leaning back, with a slanted lateen yard.
+   - Shrouds with ratlines (rope ladders) running from the main top down to the hull side, partly torn.
+   - Long tattered sails hanging from the yards and drifting like shrouds, semi-transparent.
+   - Loose ropes drifting upward.
 7. **Debris** (`#debris`): broken planks half in sand, a barrel on its side, a fallen anchor with a chain trailing across the sand, a cannon, a few scattered crates, a couple of clay amphora shards.
 8. **Life** (`#life`): sparse and low contrast so it is never mistaken for a gameplay sprite. A distant school of 10 to 15 tiny fish as hazy silhouettes in the upper background (bluish, low opacity); no large or brightly coloured fish; a crab by the anchor; a starfish; coral fans and sea fern growing on the hull and rocks in muted pinks and purples.
 9. **Foreground** (`#fore`): dark kelp fronds at the far left and right edges only (max ~80px into the frame), slightly blurred, framing the scene. Rising bubbles (small circles with a light stroke) from the break in the hull.
@@ -55,7 +59,10 @@ An old wooden three-masted sailing ship, broken and half buried on a sandy seabe
 | Water top | `#3fa9b5` |
 | Water bottom | `#0b2e4a` |
 | Sand light / dark | `#c9b27c` / `#6e6244` |
-| Wood dark / mid | `#4a3320` / `#7a5a3a` |
+| Wood dark / mid | `#3a2c22` / `#5a4632` |
+| Rim light (cold) | `#cfe8dc` |
+| Inner glow | `#6fe3c6` at very low opacity |
+| Tarnished gilt | `#8a7a4a` |
 | Algae | `#4f7a3a` |
 | Sail cloth | `#d8cfb8` |
 | Fish silver / orange | `#cfd8dc` / `#e8863a` |
@@ -63,11 +70,12 @@ An old wooden three-masted sailing ship, broken and half buried on a sandy seabe
 
 ## Composition rules
 - Play area: the band y≈80 to 540 is mostly open water. Keep it low contrast, low detail and free of hard edges, so sprites read clearly on top.
+- Only the stern castle, masts, rigging and sails may rise into the play area (up to y≈300), and only as hazy, low-contrast dark silhouettes fading into the water.
 - The wreck is the most detailed element, but its contrast and saturation stay below what gameplay sprites will use. No pure white highlights except tiny glints.
 - Hull is the focal point at the bottom; everything else supports it.
 - Depth by contrast: distant elements are bluer and lower contrast.
 - Keep important shapes clear of the edges, except the framing kelp.
 - Deterministic output: no randomness at render time (if a generator script is used, fix the seed).
 
-## Out of scope for v1
+## Out of scope
 Animation, text/labels, people or skeletons, treasure.

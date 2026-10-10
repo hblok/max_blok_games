@@ -1,4 +1,4 @@
-"""Generate wreck.svg from wreck_prompt.md (v2). Deterministic (fixed seed).
+"""Generate wreck.svg from wreck_prompt.md (v3). Deterministic (fixed seed).
 
 Usage: python maxbloks/ship/gen_wreck.py maxbloks/ship/wreck.svg
 """
@@ -20,14 +20,14 @@ def pts(seq):
     return " ".join(f"{f(x)},{f(y)}" for x, y in seq)
 
 
-# Hull placement (local coords: bow at -x, deck at -y), rotated so the bow lifts.
-HX, HY, HROT = 690, 640, 10
+# Hull placement (local coords: bow at -x, deck at -y), rotated so the stern castle rears up.
+HX, HY, HROT = 640, 650, -7
 
 o(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}">')
 o("""<defs>
   <linearGradient id="gWater" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0" stop-color="#3fa9b5"/><stop offset="0.45" stop-color="#1d6a83"/>
-    <stop offset="0.8" stop-color="#123f5c"/><stop offset="1" stop-color="#0b2e4a"/>
+    <stop offset="0" stop-color="#3fa9b5"/><stop offset="0.45" stop-color="#1a6079"/>
+    <stop offset="0.8" stop-color="#0f3854"/><stop offset="1" stop-color="#0b2e4a"/>
   </linearGradient>
   <radialGradient id="gSun" cx="0.12" cy="-0.05" r="0.75">
     <stop offset="0" stop-color="#b6efe4" stop-opacity="0.45"/><stop offset="1" stop-color="#b6efe4" stop-opacity="0"/>
@@ -48,22 +48,22 @@ o("""<defs>
     <stop offset="0" stop-color="#2a7486" stop-opacity="0.55"/><stop offset="0.35" stop-color="#2a7486" stop-opacity="0.12"/>
     <stop offset="1" stop-color="#0b2e4a" stop-opacity="0.35"/>
   </linearGradient>
-  <linearGradient id="gHull" x1="0" y1="-115" x2="0" y2="85" gradientUnits="userSpaceOnUse">
-    <stop offset="0" stop-color="#8a6842"/><stop offset="0.25" stop-color="#6e5034"/>
-    <stop offset="0.7" stop-color="#4a3320"/><stop offset="1" stop-color="#2c2420"/>
+  <linearGradient id="gHull" x1="0" y1="-215" x2="0" y2="105" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#6a5a48"/><stop offset="0.25" stop-color="#5a4632"/>
+    <stop offset="0.65" stop-color="#3a2c22"/><stop offset="1" stop-color="#1c1c1e"/>
   </linearGradient>
-  <linearGradient id="gHullShade" x1="0" y1="-115" x2="0" y2="85" gradientUnits="userSpaceOnUse">
-    <stop offset="0.35" stop-color="#0d2a33" stop-opacity="0"/><stop offset="1" stop-color="#0d2a33" stop-opacity="0.6"/>
+  <linearGradient id="gHullShade" x1="0" y1="-215" x2="0" y2="105" gradientUnits="userSpaceOnUse">
+    <stop offset="0.3" stop-color="#0a2229" stop-opacity="0"/><stop offset="1" stop-color="#0a2229" stop-opacity="0.7"/>
   </linearGradient>
-  <linearGradient id="gHullSide" x1="-345" y1="0" x2="335" y2="0" gradientUnits="userSpaceOnUse">
-    <stop offset="0" stop-color="#f3dca0" stop-opacity="0.18"/><stop offset="0.4" stop-color="#f3dca0" stop-opacity="0"/>
-    <stop offset="1" stop-color="#0d2a33" stop-opacity="0.3"/>
+  <linearGradient id="gHullSide" x1="-405" y1="0" x2="400" y2="0" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#cfe8dc" stop-opacity="0.12"/><stop offset="0.35" stop-color="#cfe8dc" stop-opacity="0"/>
+    <stop offset="1" stop-color="#0a2229" stop-opacity="0.35"/>
   </linearGradient>
   <linearGradient id="gMast" x1="0" y1="0" x2="1" y2="0">
-    <stop offset="0" stop-color="#8a8a72"/><stop offset="0.45" stop-color="#5f6656"/><stop offset="1" stop-color="#3a4a4a"/>
+    <stop offset="0" stop-color="#6f7568"/><stop offset="0.45" stop-color="#4a524a"/><stop offset="1" stop-color="#2c3434"/>
   </linearGradient>
   <linearGradient id="gHaze" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0" stop-color="#2a7a8c" stop-opacity="0.5"/><stop offset="1" stop-color="#2a7a8c" stop-opacity="0"/>
+    <stop offset="0" stop-color="#2a7a8c" stop-opacity="0.65"/><stop offset="1" stop-color="#2a7a8c" stop-opacity="0"/>
   </linearGradient>
   <linearGradient id="gCannon" x1="0" y1="0" x2="0" y2="1">
     <stop offset="0" stop-color="#6d7a76"/><stop offset="0.4" stop-color="#3b4644"/><stop offset="1" stop-color="#1f2a2c"/>
@@ -78,10 +78,11 @@ o("""<defs>
     <stop offset="0" stop-color="#1c4a45"/><stop offset="1" stop-color="#0b2328"/>
   </linearGradient>
   <radialGradient id="gVig" cx="0.5" cy="0.45" r="0.75">
-    <stop offset="0.6" stop-color="#04121c" stop-opacity="0"/><stop offset="1" stop-color="#04121c" stop-opacity="0.3"/>
+    <stop offset="0.6" stop-color="#04121c" stop-opacity="0"/><stop offset="1" stop-color="#04121c" stop-opacity="0.38"/>
   </radialGradient>
   <filter id="fRay" x="-20%" y="-5%" width="140%" height="110%"><feGaussianBlur stdDeviation="6"/></filter>
   <filter id="fSoft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="8"/></filter>
+  <filter id="fGlow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="5"/></filter>
   <filter id="fFar" x="-5%" y="-20%" width="110%" height="140%"><feGaussianBlur stdDeviation="1.6"/></filter>
   <filter id="fKelp" x="-30%" y="-5%" width="160%" height="110%"><feGaussianBlur stdDeviation="2"/></filter>
   <filter id="fSandTex" x="0" y="0" width="100%" height="100%">
@@ -89,8 +90,9 @@ o("""<defs>
     <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.25  0 0 0 0 0.2  0 0 0 0 0.12  0 0 0 0.35 0" result="c"/>
     <feComposite in="c" in2="SourceGraphic" operator="in"/>
   </filter>
-  <path id="hullShape" d="M -345 -92 C -322 -82 -302 -72 -280 -68 L 170 -62 L 178 -106 L 336 -114 L 331 42
-    C 300 72 200 80 100 82 L -150 80 C -262 72 -322 22 -345 -92 Z"/>
+  <path id="hullShape" d="M -405 -112 L -362 -104 L -358 -124 L -228 -122 L -224 -94 L 118 -92 L 122 -152 L 248 -154
+    L 252 -206 L 392 -214 C 400 -150 394 -40 372 50 C 300 90 160 100 40 100 L -200 96 C -300 86 -360 40 -380 -40
+    C -388 -70 -398 -95 -405 -112 Z"/>
   <clipPath id="cHull"><use href="#hullShape"/></clipPath>
 </defs>""")
 
@@ -129,19 +131,11 @@ o(f'<path d="{SAND_BACK}" fill="url(#gSandHaze)"/>')
 o('<path d="M0 650 C 140 636 260 644 380 652 C 520 662 620 640 760 640 C 900 640 1020 628 1200 642" fill="none" stroke="#e4d3a0" stroke-width="2" opacity="0.35"/>')
 o("</g>")
 
-# Shadows the wreck casts on the sand
-o('<g id="hull-shadow" filter="url(#fSoft)" opacity="0.55">')
-o('<ellipse cx="520" cy="706" rx="150" ry="14" fill="#0e2a30"/>')
-o('<ellipse cx="820" cy="690" rx="230" ry="18" fill="#0e2a30"/>')
+# Big soft shadow the wreck sits in, so it looms out of its own darkness
+o('<g id="hull-shadow" filter="url(#fSoft)">')
+o('<ellipse cx="640" cy="640" rx="480" ry="120" fill="#0a2430" opacity="0.35"/>')
+o('<ellipse cx="700" cy="712" rx="380" ry="20" fill="#0e2a30" opacity="0.55"/>')
 o("</g>")
-
-# Rock under the raised bow
-o('<g id="bow-rock">')
-o('<path d="M 400 712 C 404 688 424 668 452 662 C 482 656 512 664 528 682 C 538 694 540 708 536 716 Z" fill="url(#gRock)" stroke="#1f3940" stroke-width="2"/>')
-o('<path d="M 418 684 C 432 670 452 664 474 664" fill="none" stroke="#b9d6c9" stroke-width="2.5" stroke-linecap="round" opacity="0.5"/>')
-o('<path d="M 470 690 C 488 694 502 704 506 714" fill="none" stroke="#1f3940" stroke-width="1.5" opacity="0.6"/>')
-o("</g>")
-
 
 def coral_fan(x, y, s, col, rot=0):
     """Branching fan: deterministic recursive strokes."""
@@ -162,169 +156,253 @@ def coral_fan(x, y, s, col, rot=0):
     g.append("</g>")
     return "".join(g)
 
-
-# 5. Hull + 6. Masts (same rotated frame)
+# Galleon, in its own rotated frame: bow nosed down (left), stern castle rearing up (right)
 o(f'<g id="wreck" transform="translate({HX} {HY}) rotate({HROT})">')
 
-# 6a. masts behind the hull side (drawn first so the hull overlaps the bases)
+# 6. Masts, rigging, sails: drawn first so the hull overlaps their feet
 o('<g id="masts">')
-# foremast leaning forward ~35 deg
-o('<g transform="translate(-215 -64) rotate(-35)">')
-o('<path d="M -6 0 L -5 -150 L 5 -150 L 6 0 Z" fill="url(#gMast)" stroke="#2c3a3c" stroke-width="1.5"/>')
-o('<path d="M -2 -2 L -2 -146" stroke="#c9c6a6" stroke-width="1.5" opacity="0.35"/>')
-o('<path d="M -6 -150 L -3 -158 L 0 -152 L 2 -161 L 5 -150 Z" fill="#6a705e" stroke="#2c3a3c" stroke-width="1"/>')
-# yard arm, askew
-o('<g transform="translate(0 -128) rotate(14)">')
-o('<rect x="-62" y="-3.5" width="124" height="7" rx="3" fill="url(#gMast)" stroke="#2c3a3c" stroke-width="1.2"/>')
-# torn sail hanging from yard (holes via evenodd)
-o('<path fill-rule="evenodd" fill="#d8cfb8" opacity="0.5" stroke="#a9a08a" stroke-width="1" '
-  'd="M -56 3 L 52 3 C 50 30 56 52 46 78 L 40 66 L 33 88 L 24 70 L 14 96 L 6 74 L -6 90 L -12 68 L -24 84 L -30 62 '
-  'L -40 74 L -44 50 L -54 58 C -50 40 -58 20 -56 3 Z '
-  'M 10 22 L 22 26 L 26 38 L 18 50 L 12 40 L 4 36 Z"/>')
-o('<path d="M -40 10 C -38 30 -42 46 -40 60 M 0 8 C 4 30 0 50 4 70 M 34 10 C 36 30 32 48 36 62" stroke="#ffffff" stroke-width="1.2" fill="none" opacity="0.18"/>')
+# main mast: still standing, leaning back, fighting top intact, snapped above it
+o('<g transform="translate(60 -92) rotate(6)">')
+o('<path d="M -8 30 L -6 -238 L -3 -252 L 0 -242 L 2 -256 L 4 -240 L 6 -246 L 8 30 Z" fill="url(#gMast)" stroke="#1e2a2c" stroke-width="1.5"/>')
+o('<path d="M -3 26 L -3 -236" stroke="#cfe8dc" stroke-width="1.5" opacity="0.25"/>')
+for y in (-60, -120):  # iron mast bands
+    o(f'<rect x="-9" y="{y}" width="18" height="5" rx="1.5" fill="#2c3434"/>')
+# fighting top: platform + cone underneath + rail
+o('<path d="M -12 -178 L -28 -190 L 28 -190 L 12 -178 Z" fill="#3a443e" stroke="#1e2a2c" stroke-width="1.2"/>')
+o('<rect x="-30" y="-196" width="60" height="7" rx="2" fill="#4a524a" stroke="#1e2a2c" stroke-width="1.2"/>')
+o('<path d="M -28 -196 V -212 M -14 -196 V -212 M 14 -196 V -212 M 28 -196 V -212 M -30 -212 H 30" stroke="#3a443e" stroke-width="2.5"/>')
+o('<path d="M -16 -212 V -218 L -10 -210" stroke="#3a443e" stroke-width="2.5" fill="none"/>')
+o('<path d="M -30 -197 H 30" stroke="#cfe8dc" stroke-width="1" opacity="0.3"/>')
+# main yard, askew, with a long tattered sail drifting with the current
+o('<g transform="translate(0 -150) rotate(17)">')
+o('<path fill-rule="evenodd" fill="#c8d2c4" opacity="0.32" stroke="#8c9a90" stroke-width="1" '
+  'd="M -96 4 L 104 4 C 116 50 128 100 150 160 L 136 146 L 132 178 L 118 150 L 104 196 L 94 154 L 76 174 '
+  'L 66 132 L 50 150 L 40 112 L 22 128 L 16 92 L -4 104 L -10 70 L -30 84 L -36 50 L -56 62 L -62 30 L -82 40 C -88 28 -94 16 -96 4 Z '
+  'M 40 40 L 58 46 L 64 66 L 52 84 L 44 70 L 34 62 Z"/>')
+o('<path d="M -60 10 C -50 30 -44 44 -40 60 M 0 8 C 14 40 22 70 30 100 M 60 10 C 74 50 88 90 100 140" stroke="#ffffff" stroke-width="1.2" fill="none" opacity="0.14"/>')
+o('<path d="M -104 -4 L 112 -4 L 116 0 L 112 4 L -100 4 L -108 6 L -104 0 L -110 -6 Z" fill="url(#gMast)" stroke="#1e2a2c" stroke-width="1.2"/>')
 o("</g>")
 o("</g>")
-# main mast snapped at one third, splintered
-o('<g transform="translate(-30 -62) rotate(-4)">')
-o('<path d="M -8 0 L -7 -96 L -4 -110 L -1 -100 L 2 -114 L 4 -98 L 7 -104 L 8 0 Z" fill="url(#gMast)" stroke="#2c3a3c" stroke-width="1.5"/>')
-o('<path d="M -3 -4 L -3 -94" stroke="#c9c6a6" stroke-width="1.5" opacity="0.35"/>')
-o('<rect x="-11" y="-60" width="22" height="6" rx="2" fill="#4c564c" stroke="#2c3a3c" stroke-width="1"/>')
+# foremast: broken, leaning far forward, a rag still on its yard
+o('<g transform="translate(-300 -122) rotate(-42)">')
+o('<path d="M -6 10 L -5 -150 L -2 -158 L 1 -151 L 3 -161 L 6 -148 L 7 10 Z" fill="url(#gMast)" stroke="#1e2a2c" stroke-width="1.5"/>')
+o('<g transform="translate(0 -118) rotate(30)">')
+o('<path d="M -50 3 L 46 3 C 50 30 62 54 70 80 L 58 70 L 52 96 L 40 72 L 30 90 L 22 62 L 8 78 L 2 50 L -14 60 L -18 34 L -36 42 C -40 26 -46 14 -50 3 Z" fill="#c8d2c4" opacity="0.3" stroke="#8c9a90" stroke-width="1"/>')
+o('<rect x="-56" y="-3" width="112" height="6" rx="2.5" fill="url(#gMast)" stroke="#1e2a2c" stroke-width="1.2"/>')
+o("</g></g>")
+# mizzen: snapped, leaning back, slanted lateen yard
+o('<g transform="translate(220 -154) rotate(16)">')
+o('<path d="M -6 10 L -5 -112 L -2 -120 L 0 -110 L 3 -124 L 6 -108 L 6 10 Z" fill="url(#gMast)" stroke="#1e2a2c" stroke-width="1.5"/>')
+o('<g transform="translate(0 -84) rotate(-52)"><path d="M -96 -2 L 70 -3 L 66 0 L 74 3 L -96 3 Z" fill="url(#gMast)" stroke="#1e2a2c" stroke-width="1.2"/></g>')
 o("</g>")
-# mizzen: just a stump
-o('<path d="M 226 -110 L 227 -136 L 230 -130 L 233 -140 L 236 -128 L 238 -110 Z" fill="url(#gMast)" stroke="#2c3a3c" stroke-width="1.2"/>')
-# bowsprit, snapped
-o('<path d="M -330 -86 L -398 -124 L -402 -116 L -396 -131 L -393 -122 L -326 -80 Z" fill="url(#gMast)" stroke="#2c3a3c" stroke-width="1.2"/>')
-# ropes: sagging rigging + loose drifting ends
-o('<g fill="none" stroke="#24363a" stroke-linecap="round" opacity="0.75">')
-o('<path d="M -38 -150 C -110 -100 -200 -80 -300 -78" stroke-width="1.6"/>')
-o('<path d="M -36 -130 C -60 -96 -70 -80 -86 -64" stroke-width="1.3"/>')
-o('<path d="M -24 -130 C 10 -100 40 -80 70 -64" stroke-width="1.3"/>')
-o('<path d="M -300 -165 C -330 -140 -360 -120 -394 -120" stroke-width="1.4"/>')
-o('<path d="M -296 -170 C -280 -200 -250 -210 -236 -236 C -228 -250 -240 -262 -230 -276" stroke-width="1.2" opacity="0.7"/>')
-o('<path d="M 232 -132 C 260 -160 250 -190 276 -210 C 296 -226 286 -246 300 -258" stroke-width="1.2" opacity="0.6"/>')
+# bowsprit, snapped, jutting from the beakhead
+o('<path d="M -392 -116 L -476 -168 L -480 -158 L -474 -176 L -468 -166 L -386 -108 Z" fill="url(#gMast)" stroke="#1e2a2c" stroke-width="1.2"/>')
+
+
+def lerp(a, b, t):
+    return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+
+
+# shrouds + ratlines from the main top down to the channels (some ratlines torn away)
+top_l, top_r = (55, -278), (95, -282)
+feet = [(84, -96), (104, -96), (130, -146), (152, -148), (174, -150)]
+o('<g fill="none" stroke="#1e2e30" stroke-linecap="round" opacity="0.8">')
+shrouds = []
+for i, foot in enumerate(feet):
+    top = lerp(top_l, top_r, i / (len(feet) - 1))
+    shrouds.append((top, foot))
+    if i == 3:  # one shroud snapped, its end drifting
+        mid = lerp(top, foot, 0.45)
+        o(f'<path d="M {f(top[0])} {f(top[1])} L {f(mid[0])} {f(mid[1])} q 14 10 6 26 t 8 22" stroke-width="1.6"/>')
+    else:
+        o(f'<path d="M {f(top[0])} {f(top[1])} L {f(foot[0])} {f(foot[1])}" stroke-width="1.8"/>')
+for k in range(1, 12):
+    t = k / 12
+    if k in (5, 6, 9):
+        continue
+    for i in range(len(shrouds) - 1):
+        if 3 in (i, i + 1) and t > 0.45:
+            continue
+        a = lerp(*shrouds[i], t)
+        b = lerp(*shrouds[i + 1], t)
+        o(f'<path d="M {f(a[0])} {f(a[1])} L {f(b[0])} {f(b[1])}" stroke-width="1"/>')
+# stays: forestay sagging to the bowsprit, backstay to the stern castle, loose ends drifting up
+o('<path d="M 62 -280 C -100 -190 -300 -170 -470 -164" stroke-width="1.8"/>')
+o('<path d="M 96 -282 C 200 -250 300 -230 384 -212" stroke-width="1.5"/>')
+o('<path d="M 70 -286 C 60 -320 90 -340 76 -372 C 68 -390 84 -404 78 -420" stroke-width="1.3" opacity="0.6"/>')
+o('<path d="M -330 -230 C -340 -260 -320 -280 -334 -306" stroke-width="1.2" opacity="0.6"/>')
+o('<path d="M 232 -270 C 250 -296 236 -316 256 -338" stroke-width="1.2" opacity="0.6"/>')
 o("</g>")
-# haze over everything high up (masts are in the play area -> distance tone)
-o("</g>")
+o("</g>")  # masts
+
+# beakhead + eroded figurehead stub (no face), behind the bow planking
+o('<path d="M -400 -116 L -446 -132 L -452 -124 L -404 -100 Z" fill="#3a2c22" stroke="#1a1410" stroke-width="1.5"/>')
+o('<path d="M -444 -126 C -468 -138 -478 -164 -462 -186 L -458 -178 L -452 -190 L -446 -180 C -456 -164 -452 -148 -428 -132 Z" fill="#33281f" stroke="#140f0b" stroke-width="1.5" stroke-linejoin="round"/>')
+o('<path d="M -446 -134 C -462 -146 -466 -164 -458 -178" fill="none" stroke="#8a7a4a" stroke-width="1.5" opacity="0.5"/>')
+o('<path d="M -470 -150 C -472 -164 -468 -176 -462 -184" fill="none" stroke="#cfe8dc" stroke-width="1.2" opacity="0.35"/>')
 
 # 5. Hull body
 o('<g id="hull">')
 o('<use href="#hullShape" fill="url(#gHull)"/>')
 o('<g clip-path="url(#cHull)">')
-# plank colour variation
-for i, y in enumerate(range(-112, 86, 14)):
-    shade = R.choice(["#000000", "#ffffff", "#2a1a0e", "#f0d9a8"])
-    op = R.uniform(0.03, 0.09)
-    o(f'<path d="M -360 {y} Q 0 {y + 8} 360 {y} V {y + 14} Q 0 {y + 22} -360 {y + 14} Z" fill="{shade}" opacity="{f(op)}"/>')
-# plank seams + top highlights + plank butt joints
-for y in range(-98, 86, 14):
-    o(f'<path d="M -360 {y} Q 0 {y + 8} 360 {y}" fill="none" stroke="#24170c" stroke-width="1.6" opacity="0.7"/>')
-    o(f'<path d="M -360 {y + 2} Q 0 {y + 10} 360 {y + 2}" fill="none" stroke="#e8c98f" stroke-width="1" opacity="0.13"/>')
+for y in range(-220, 100, 14):  # plank colour variation
+    shade = R.choice(["#000000", "#ffffff", "#1a1410", "#cfe8dc"])
+    o(f'<path d="M -420 {y} Q 0 {y + 8} 420 {y} V {y + 14} Q 0 {y + 22} -420 {y + 14} Z" fill="{shade}" opacity="{f(R.uniform(0.03, 0.08))}"/>')
+for y in range(-206, 100, 14):  # seams, plank top highlights, butt joints
+    o(f'<path d="M -420 {y} Q 0 {y + 8} 420 {y}" fill="none" stroke="#17100a" stroke-width="1.6" opacity="0.75"/>')
+    o(f'<path d="M -420 {y + 2} Q 0 {y + 10} 420 {y + 2}" fill="none" stroke="#cfe8dc" stroke-width="1" opacity="0.07"/>')
     for k in range(3):
-        bx = R.uniform(-320, 320)
-        by = y + 8 * (1 - (bx / 360) ** 2) + 7
-        o(f'<path d="M {f(bx)} {f(by - 6)} L {f(bx)} {f(by + 6)}" stroke="#24170c" stroke-width="1.2" opacity="0.5"/>')
-# wale (thick rubbing strake) along the gun deck
-o('<path d="M -330 -52 Q 0 -40 340 -58" fill="none" stroke="#2e1f12" stroke-width="7"/>')
-o('<path d="M -330 -55 Q 0 -43 340 -61" fill="none" stroke="#b58e5c" stroke-width="1.5" opacity="0.45"/>')
+        bx = R.uniform(-380, 380)
+        by = y + 8 * (1 - (bx / 420) ** 2) + 7
+        o(f'<path d="M {f(bx)} {f(by - 6)} L {f(bx)} {f(by + 6)}" stroke="#17100a" stroke-width="1.2" opacity="0.5"/>')
+# wales along both gun decks and the castle
+for d, w in (("M -390 -4 Q 0 8 400 -8", 8), ("M -370 -48 Q 0 -38 400 -54", 7), ("M 118 -112 Q 260 -108 400 -118", 6), ("M 250 -166 Q 320 -164 400 -170", 5)):
+    o(f'<path d="{d}" fill="none" stroke="#1e150e" stroke-width="{w}"/>')
+    o(f'<path d="{d}" fill="none" stroke="#8a7a4a" stroke-width="1.2" opacity="0.45" transform="translate(0 {-w / 2})"/>')
 # missing planks near the keel
-for x, y, w in ((-205, 46, 52), (-150, 58, 38), (150, 52, 44), (232, 40, 30)):
-    o(f'<path d="M {x} {y} l {w} -2 l -3 13 l -{w - 6} 3 Z" fill="#0f1e22"/>')
-    o(f'<path d="M {x} {y} l {w} -2" stroke="#9a7a50" stroke-width="1.5" opacity="0.6"/>')
-# algae + weed on lower half
-o('<g fill="#4f7a3a">')
-for _ in range(16):
-    x = R.uniform(-300, 320)
-    y = R.uniform(20, 75)
-    rx, ry = R.uniform(14, 40), R.uniform(5, 12)
-    o(f'<ellipse cx="{f(x)}" cy="{f(y)}" rx="{f(rx)}" ry="{f(ry)}" opacity="{f(R.uniform(0.25, 0.45))}"/>')
+for x, y, w in ((-290, 46, 54), (-230, 66, 40), (150, 70, 46), (260, 52, 34)):
+    o(f'<path d="M {x} {y} l {w} -2 l -3 13 l -{w - 6} 3 Z" fill="#0a161a"/>')
+    o(f'<path d="M {x} {y} l {w} -2" stroke="#7a6a50" stroke-width="1.5" opacity="0.6"/>')
+# algae + draping weed on the lower hull
+o('<g fill="#3f6a3a">')
+for _ in range(20):
+    o(f'<ellipse cx="{f(R.uniform(-380, 370))}" cy="{f(R.uniform(30, 96))}" rx="{f(R.uniform(16, 44))}" ry="{f(R.uniform(5, 13))}" opacity="{f(R.uniform(0.25, 0.45))}"/>')
 o("</g>")
-o('<g fill="none" stroke="#6a6a2e" stroke-linecap="round" opacity="0.55">')
-for _ in range(14):
-    x = R.uniform(-290, 320)
-    y = R.uniform(-30, 30)
-    ln = R.uniform(10, 24)
-    o(f'<path d="M {f(x)} {f(y)} q 3 {f(ln / 2)} -1 {f(ln)} t 1 {f(ln / 2)}" stroke-width="1.6"/>')
-o("</g>")
-# barnacle clusters along the wreck's waterline
 o('<g>')
-for cx in (-280, -230, -170, -120, 130, 190, 250, 300):
+for cx in (-340, -290, -230, 110, 180, 250, 320):  # barnacle clusters
     for _ in range(9):
         bx = cx + R.gauss(0, 12)
-        by = 24 + 0.0002 * bx * bx + R.gauss(0, 5)
+        by = 34 + 0.0002 * bx * bx + R.gauss(0, 5)
         r = R.uniform(1.2, 2.8)
-        o(f'<circle cx="{f(bx)}" cy="{f(by)}" r="{f(r)}" fill="#e2ddcb" opacity="0.75"/>')
-        o(f'<circle cx="{f(bx + 0.3)}" cy="{f(by + 0.3)}" r="{f(r * 0.4)}" fill="#5e5a4a" opacity="0.6"/>')
+        o(f'<circle cx="{f(bx)}" cy="{f(by)}" r="{f(r)}" fill="#c9cfc2" opacity="0.6"/>')
+        o(f'<circle cx="{f(bx + 0.3)}" cy="{f(by + 0.3)}" r="{f(r * 0.4)}" fill="#3e4a44" opacity="0.6"/>')
 o("</g>")
-# gun ports (one hatch hanging open)
-for i, x in enumerate((-250, -180, 118, 250)):
-    y = -36 + 0.00007 * x * x - (8 if x > 170 else 0)
-    o(f'<rect x="{x - 9}" y="{f(y - 8)}" width="18" height="16" rx="1.5" fill="#120d0a" stroke="#9a7a50" stroke-width="1.6"/>')
-    if i == 1:
-        o(f'<g transform="translate({x - 9} {f(y + 8)}) rotate(24)"><rect width="18" height="16" rx="1.5" fill="#5a4028" stroke="#2a1a0e" stroke-width="1.2"/>'
-          '<path d="M2 5 H16 M2 11 H16" stroke="#2a1a0e" stroke-width="1"/></g>')
-    elif i == 3:
-        o(f'<g transform="translate({x - 9} {f(y + 8)}) rotate(68)"><rect width="18" height="16" rx="1.5" fill="#5a4028" stroke="#2a1a0e" stroke-width="1.2"/></g>')
-# big jagged break amidships: dark interior, deck beam, ribs
-HOLE = "M -78 -70 L -60 -48 L -76 -22 L -60 4 L -70 34 L -40 54 L -8 46 L 22 58 L 56 50 L 84 40 L 76 16 L 98 -8 L 82 -34 L 104 -72 Z"
-o(f'<path d="{HOLE}" fill="#0c1a1e"/>')
+
+# gun ports: two decks; some lids hanging, some muzzles, a few faintly glowing
+HOLE_X = (-176, 66)
+GLOW_PORTS = []
+ports = [(x, -26) for x in range(-330, 380, 52)] + [(x, -72) for x in range(-200, 118, 52)] + [(x, -132) for x in (150, 200)]
+for i, (x, y) in enumerate(ports):
+    if HOLE_X[0] < x < HOLE_X[1]:
+        continue
+    y += 0.00007 * x * x
+    o(f'<rect x="{x - 9}" y="{f(y - 8)}" width="18" height="16" rx="1.5" fill="#070f12" stroke="#6a5a44" stroke-width="1.6"/>')
+    kind = i % 5
+    if kind == 1:
+        o(f'<g transform="translate({x - 9} {f(y + 8)}) rotate({20 + 9 * (i % 3)})"><rect width="18" height="16" rx="1.5" fill="#3e3024" stroke="#17100a" stroke-width="1.2"/>'
+          '<path d="M2 5 H16 M2 11 H16" stroke="#17100a" stroke-width="1"/></g>')
+    elif kind == 3:
+        o(f'<circle cx="{x}" cy="{f(y)}" r="6" fill="#2a3436" stroke="#5a6a66" stroke-width="1.5"/><circle cx="{x}" cy="{f(y)}" r="3" fill="#050a0c"/>')
+    elif kind in (0, 4) and len(GLOW_PORTS) < 4:
+        GLOW_PORTS.append((x, y))
+
+# quarter gallery on the stern castle: bay of tall arched windows, tarnished gilt trim
+o('<path d="M 282 -200 L 376 -204 L 374 -116 C 352 -96 306 -96 284 -112 Z" fill="#2e241c" stroke="#17100a" stroke-width="2"/>')
+o('<path d="M 282 -200 L 376 -204 M 284 -112 C 306 -96 352 -96 374 -116" fill="none" stroke="#8a7a4a" stroke-width="2.5" opacity="0.6"/>')
+WINDOWS = [(298, -184), (322, -185), (346, -186)]
+for x, y in WINDOWS:
+    o(f'<path d="M {x - 8} {y + 44} V {y + 8} A 8 8 0 0 1 {x + 8} {y + 8} V {y + 44} Z" fill="#050d10" stroke="#8a7a4a" stroke-width="1.5" opacity="0.95"/>')
+    o(f'<path d="M {x} {y + 2} V {y + 44} M {x - 8} {y + 24} H {x + 8}" stroke="#2e241c" stroke-width="1.5"/>')
+# carved scrolls flanking the gallery
+for x, y, s in ((278, -150, 1), (380, -152, -1)):
+    o(f'<path d="M {x} {y - 30} C {x - 8 * s} {y - 10} {x - 8 * s} {y + 10} {x} {y + 22} C {x + 6 * s} {y + 26} {x + 8 * s} {y + 18} {x + 3 * s} {y + 14}" fill="none" stroke="#8a7a4a" stroke-width="2.5" opacity="0.55"/>')
+
+# big jagged break amidships
+HOLE = "M -156 -96 L -136 -66 L -154 -36 L -134 -6 L -148 30 L -120 66 L -80 56 L -50 74 L -10 62 L 26 50 L 18 18 L 40 -14 L 24 -46 L 48 -96 Z"
+o(f'<path d="{HOLE}" fill="#08141a"/>')
 o(f'<clipPath id="cHole"><path d="{HOLE}"/></clipPath>')
 o('<g clip-path="url(#cHole)">')
-o('<rect x="-100" y="-80" width="220" height="150" fill="#16343a" opacity="0.35"/>')
-o('<path d="M -90 -4 Q 10 4 110 -6" stroke="#3a2a1c" stroke-width="9" fill="none"/>')
-o('<path d="M -90 -8 Q 10 0 110 -10" stroke="#8a6a44" stroke-width="1.5" fill="none" opacity="0.5"/>')
+o('<ellipse cx="-56" cy="10" rx="80" ry="60" fill="#6fe3c6" opacity="0.13" filter="url(#fSoft)"/>')
+for y in (-50, 6):  # the two gun decks seen through the break
+    o(f'<path d="M -170 {y} Q -50 {y + 6} 60 {y - 4}" stroke="#241a12" stroke-width="9" fill="none"/>')
+    o(f'<path d="M -170 {y - 4} Q -50 {y + 2} 60 {y - 8}" stroke="#7a6a50" stroke-width="1.3" fill="none" opacity="0.5"/>')
 o("</g>")
-ribs = [(-56, 0), (-40, 1), (-24, 0.55), (-8, 1), (8, 0.4), (24, 1), (40, 0.7), (56, 1), (72, 0.5)]
-for x, frac in ribs:
-    top = 52 - 120 * frac
-    d = f"M {x - 2} 52 Q {x - 9} {f((52 + top) / 2)} {x - 1} {f(top)}"
-    o(f'<path d="{d}" fill="none" stroke="#2a1c10" stroke-width="9" stroke-linecap="butt"/>')
-    o(f'<path d="{d}" fill="none" stroke="#6e5034" stroke-width="6"/>')
-    o(f'<path d="M {x - 4} 50 Q {x - 11} {f((52 + top) / 2)} {x - 3} {f(top + 2)}" fill="none" stroke="#d9b984" stroke-width="1.3" opacity="0.5"/>')
-    if frac < 1:  # snapped: splinter tip
-        o(f'<path d="M {x - 5} {f(top + 3)} L {x - 3} {f(top - 6)} L {x - 1} {f(top + 1)} L {x + 1} {f(top - 9)} L {x + 3} {f(top + 3)} Z" fill="#7a5a3a" stroke="#2a1c10" stroke-width="1"/>')
-# splintered plank ends around the break
-o(f'<path d="{HOLE}" fill="none" stroke="#a07c4e" stroke-width="2.5" stroke-linejoin="miter"/>')
-for x, y, a in ((-78, -70, 200), (-60, -48, 160), (-76, -22, 200), (-70, 34, 210), (82, -34, -20), (98, -8, 10), (104, -72, -30), (76, 16, -10)):
-    o(f'<path transform="translate({x} {y}) rotate({a})" d="M 0 -2 L 12 -1 L 5 0 L 14 1 L 0 3 Z" fill="#9a7650" stroke="#2a1c10" stroke-width="0.8"/>')
-# keel beam
-o('<path d="M -330 -6 C -300 50 -240 82 -150 86 L 100 88 C 200 86 296 78 334 46" fill="none" stroke="#24170c" stroke-width="11"/>')
-o('<path d="M -326 -8 C -296 46 -238 77 -150 81 L 100 83 C 200 81 294 73 330 42" fill="none" stroke="#7a5a3a" stroke-width="2" opacity="0.5"/>')
-# volume shading: sunlit bow, shadowed stern, darker bottom
-o('<rect x="-400" y="-130" width="800" height="230" fill="url(#gHullSide)"/>')
-o('<rect x="-400" y="-130" width="800" height="230" fill="url(#gHullShade)"/>')
+for x, frac in ((-142, 0), (-126, 1), (-110, 0.5), (-94, 1), (-78, 0.35), (-62, 1), (-46, 0.75), (-30, 1), (-14, 0.45), (2, 1), (18, 0.6)):
+    top = 60 - 150 * frac if frac else 30
+    d = f"M {x - 2} 62 Q {x - 10} {f((62 + top) / 2)} {x - 1} {f(top)}"
+    o(f'<path d="{d}" fill="none" stroke="#17100a" stroke-width="10"/>')
+    o(f'<path d="{d}" fill="none" stroke="#4e3e30" stroke-width="7"/>')
+    o(f'<path d="M {x - 4} 60 Q {x - 12} {f((62 + top) / 2)} {x - 3} {f(top + 2)}" fill="none" stroke="#cfe8dc" stroke-width="1.2" opacity="0.25"/>')
+    if frac < 1:
+        o(f'<path d="M {x - 5} {f(top + 3)} L {x - 3} {f(top - 7)} L {x - 1} {f(top + 1)} L {x + 1} {f(top - 10)} L {x + 3} {f(top + 3)} Z" fill="#5a4632" stroke="#17100a" stroke-width="1"/>')
+o(f'<path d="{HOLE}" fill="none" stroke="#6a5a44" stroke-width="2.5"/>')
+for x, y, a in ((-156, -96, 200), (-136, -66, 160), (-154, -36, 200), (-148, 30, 210), (24, -46, -20), (40, -14, 10), (48, -96, -30), (18, 18, -10)):
+    o(f'<path transform="translate({x} {y}) rotate({a})" d="M 0 -2 L 14 -1 L 5 0 L 16 1 L 0 3 Z" fill="#5a4632" stroke="#17100a" stroke-width="0.8"/>')
+# keel
+o('<path d="M -386 -40 C -364 44 -300 92 -200 102 L 40 106 C 160 106 300 96 378 54" fill="none" stroke="#17100a" stroke-width="12"/>')
+# volume shading: cold light on the bow side, heavy shade low and aft
+o('<rect x="-480" y="-240" width="960" height="360" fill="url(#gHullSide)"/>')
+o('<rect x="-480" y="-240" width="960" height="360" fill="url(#gHullShade)"/>')
 o("</g>")  # end clip
-# outline + rim light on the sun-facing deck edge and bow
-o('<use href="#hullShape" fill="none" stroke="#24170c" stroke-width="2.2" stroke-linejoin="round"/>')
-o('<path d="M -343 -90 C -322 -80 -302 -70 -280 -66 L -78 -64" fill="none" stroke="#f6e2ad" stroke-width="2" opacity="0.7"/>')
-o('<path d="M 104 -64 L 168 -62 M 180 -108 L 334 -116" fill="none" stroke="#f6e2ad" stroke-width="2" opacity="0.55"/>')
-o('<path d="M -343 -88 C -322 20 -262 70 -160 78" fill="none" stroke="#f6e2ad" stroke-width="1.6" opacity="0.3"/>')
-# coral fans + sea fern growing on the hull
-o(coral_fan(-262, 54, 1.0, "#d46a8a", -8))
-o(coral_fan(-214, 64, 0.7, "#8e5fa8", 6))
-o(coral_fan(270, 30, 0.8, "#8e5fa8", 4))
-o('<g fill="none" stroke="#5f8a4a" stroke-width="1.6" stroke-linecap="round" opacity="0.8">')
-for x in (-120, -112, 214, 222):
-    o(f'<path d="M {x} 62 C {x - 6} 46 {x + 6} 34 {x} 18"/>')
+
+# faint inner glow: a few ports and the gallery windows, felt more than seen
+o('<g fill="#6fe3c6" filter="url(#fGlow)">')
+for x, y in GLOW_PORTS:
+    o(f'<ellipse cx="{x}" cy="{f(y)}" rx="9" ry="7" opacity="0.32"/>')
+for x, y in WINDOWS:
+    o(f'<rect x="{x - 6}" y="{y + 10}" width="12" height="30" rx="5" opacity="0.22"/>')
+o("</g>")
+
+o('<use href="#hullShape" fill="none" stroke="#17100a" stroke-width="2.4" stroke-linejoin="round"/>')
+# gilt rail trim + cold rim light along the top edges
+o('<path d="M -362 -106 L -358 -124 L -228 -122 M 122 -152 L 248 -154 M 252 -206 L 392 -214" fill="none" stroke="#8a7a4a" stroke-width="2" opacity="0.55" transform="translate(0 6)"/>')
+o('<path d="M -403 -114 L -362 -106 L -358 -126 L -228 -124 M -224 -96 L -156 -96 M 48 -96 L 118 -94 L 122 -154 L 248 -156 L 252 -208 L 392 -216" fill="none" stroke="#cfe8dc" stroke-width="2" opacity="0.6"/>')
+o('<path d="M -403 -110 C -394 -80 -386 -60 -380 -40" fill="none" stroke="#cfe8dc" stroke-width="1.6" opacity="0.35"/>')
+# rail posts along the waist and castle
+o('<g stroke="#2e241c" stroke-width="3">')
+for x in range(-216, 118, 26):
+    if not (HOLE_X[0] - 6 < x < HOLE_X[1] - 10):
+        o(f'<path d="M {x} -94 V -108"/>')
+o('<path d="M -216 -108 H -162 M 62 -108 H 118" stroke-width="3"/>')
+o("</g>")
+# broken stern lantern hanging askew from its bracket
+o('<path d="M 388 -214 L 404 -232 L 412 -230" fill="none" stroke="#2c3434" stroke-width="3"/>')
+o('<g transform="translate(412 -230) rotate(24)">')
+o('<path d="M 0 0 V 6" stroke="#2c3434" stroke-width="2"/>')
+o('<path d="M -8 6 L 8 6 L 10 12 L 8 30 L -8 30 L -10 12 Z" fill="#0a1418" stroke="#6a5e3e" stroke-width="2"/>')
+o('<path d="M 0 6 V 30 M -9 18 H 9" stroke="#6a5e3e" stroke-width="1.2"/>')
+o('<path d="M -6 30 L 0 38 L 6 30" fill="#6a5e3e"/>')
+o("</g>")
+# long dark weed draping from the rails
+o('<g fill="none" stroke="#2c4a34" stroke-linecap="round" opacity="0.75">')
+for x, y0 in [(x, -94) for x in (-210, -190, 70, 96)] + [(x, -152) for x in (140, 170, 210)] + [(x, -206) for x in (262, 300, 360)] + [(-300, -122), (-262, -122)]:
+    ln = R.uniform(30, 80)
+    sw = R.uniform(1.6, 3)
+    o(f'<path d="M {x} {y0} c 4 {f(ln * 0.3)} -6 {f(ln * 0.6)} -2 {f(ln)} s 6 {f(ln * 0.4)} 2 {f(ln * 0.6)}" stroke-width="{f(sw)}"/>')
+o("</g>")
+# coral + sea fern on the lower hull (muted)
+o(coral_fan(-320, 40, 0.9, "#9a5a72", -8))
+o(coral_fan(250, 64, 0.8, "#6e5a8a", 4))
+o('<g fill="none" stroke="#4f7a4a" stroke-width="1.6" stroke-linecap="round" opacity="0.7">')
+for x in (-250, -242, 190, 198):
+    o(f'<path d="M {x} 80 C {x - 6} 64 {x + 6} 52 {x} 36"/>')
     for k in range(4):
-        yy = 54 - k * 10
+        yy = 72 - k * 10
         o(f'<path d="M {x - 1} {yy} q -6 -3 -9 -8 M {x + 1} {yy - 4} q 6 -3 9 -8" stroke-width="1"/>')
 o("</g>")
 o("</g>")  # hull
 o("</g>")  # wreck frame
 
+# Rock outcrop the stern rests on
+o('<g id="stern-rock">')
+o('<path d="M 846 716 C 858 690 892 674 934 678 C 972 682 996 662 1040 658 C 1084 654 1116 678 1124 716 Z" fill="url(#gRock)" stroke="#1a3038" stroke-width="2"/>')
+o('<path d="M 870 692 C 890 680 912 676 934 678 M 1000 666 C 1016 660 1030 658 1046 658" fill="none" stroke="#b9d6c9" stroke-width="2.5" stroke-linecap="round" opacity="0.35"/>')
+o('<path d="M 960 690 C 980 698 996 706 1004 716" fill="none" stroke="#1a3038" stroke-width="1.5" opacity="0.6"/>')
+o("</g>")
+
 # Depth haze: everything above the play-area floor fades into the water.
 o('<filter id="fWhite"><feFlood flood-color="#fff"/><feComposite in2="SourceAlpha" operator="in"/></filter>'
   '<mask id="mWreck" maskUnits="userSpaceOnUse" x="0" y="0" width="1200" height="800"><use href="#wreck" filter="url(#fWhite)"/></mask>')
-o('<rect id="haze" x="0" y="380" width="1200" height="200" fill="url(#gHaze)" mask="url(#mWreck)"/>')
+o('<rect id="haze" x="0" y="280" width="1200" height="330" fill="url(#gHaze)" mask="url(#mWreck)"/>')
 
 # Near sand in front of the wreck: buries the stern and the keel
-SAND_FRONT = ("M0 724 C 120 716 250 722 360 718 C 430 716 500 712 560 712 C 640 712 700 706 760 698 "
-              "C 840 688 900 668 960 662 C 1030 656 1090 676 1140 690 C 1170 698 1190 700 1200 700 V800 H0 Z")
+SAND_FRONT = ("M0 700 C 80 690 170 650 260 640 C 320 634 360 660 420 690 C 480 708 560 714 640 714 "
+              "C 740 714 820 712 880 710 C 960 708 1040 712 1120 706 C 1160 703 1185 702 1200 702 V800 H0 Z")
 o('<g id="sand-front">')
 o(f'<path d="{SAND_FRONT}" fill="url(#gSand)"/>')
 o(f'<path d="{SAND_FRONT}" fill="#000" filter="url(#fSandTex)" opacity="0.6"/>')
-o('<path d="M 560 712 C 640 712 700 706 760 698 C 840 688 900 668 960 662 C 1030 656 1090 676 1140 690" fill="none" stroke="#e8d7a4" stroke-width="2.5" opacity="0.55"/>')
-o('<path d="M 600 716 C 700 712 860 690 980 676 C 1050 670 1100 690 1140 700" fill="none" stroke="#6e6244" stroke-width="10" opacity="0.25" filter="url(#fSoft)"/>')
+o('<path d="M 80 690 C 170 650 260 640 260 640 C 320 634 360 660 420 690 C 480 708 560 714 640 714" fill="none" stroke="#e8d7a4" stroke-width="2.5" opacity="0.5"/>')
+o('<path d="M 360 670 C 480 716 700 720 880 716" fill="none" stroke="#6e6244" stroke-width="10" opacity="0.25" filter="url(#fSoft)"/>')
 # ripples
 o('<g fill="none" stroke="#6e6244" stroke-linecap="round" opacity="0.35">')
 for _ in range(34):
@@ -442,8 +520,8 @@ o(f'<polygon points="{pts(star)}" fill="#b86a5a" stroke="#5a2a1e" stroke-width="
 o('<circle r="2" fill="#e8b49a" opacity="0.6"/>')
 o("</g>")
 # coral and fern on the bow rock and sand
-o(coral_fan(440, 672, 0.9, "#d46a8a", -12))
-o(coral_fan(510, 676, 0.6, "#8e5fa8", 10))
+o(coral_fan(892, 684, 0.9, "#9a5a72", -12))
+o(coral_fan(1086, 664, 0.6, "#6e5a8a", 10))
 o(coral_fan(84, 728, 1.1, "#8e5fa8", -4))
 o(coral_fan(1172, 712, 0.8, "#d46a8a", 8))
 o("</g>")
@@ -472,7 +550,7 @@ for x0, lean, h, w in ((1190, -40, 500, 26), (1162, -24, 360, 20), (1206, -62, 2
     o(kelp(x0, lean, h, w))
 o("</g>")
 # bubbles from the break in the hull
-bx, by = 708, 600
+bx, by = 588, 620
 o('<g fill="#bfe8ec" fill-opacity="0.12" stroke="#d6f4f4" stroke-width="1" opacity="0.7">')
 for i in range(11):
     y = by - i * 22 - R.uniform(0, 10)
