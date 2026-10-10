@@ -13,3 +13,18 @@ cartoon style (however, not at all childish - it should be extremely polished), 
 
 ## 4
 commit and push
+
+## 5
+render the svg
+
+## 6
+keep the script in the repo as well
+
+## 7
+no, do NOT use anything else in the repo
+
+## 8
+no build
+
+## 9
+commit and push
