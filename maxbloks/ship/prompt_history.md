@@ -7,3 +7,9 @@ In maxbloks/ship I would like to render an image of a ship wreck in SVG. However
 
 ## 2
 commit and push
+
+## 3
+cartoon style (however, not at all childish - it should be extremely polished), 1200x800 is fine, used as game background
+
+## 4
+commit and push
